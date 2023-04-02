@@ -10,25 +10,27 @@
    },
    "preferencies": {
       "recipes": {
-         "petroleum-gas": {
-            "light-oil-cracking": 0.4359,
-            "advanced-oil-processing": 0.5641
-         },
-         "heavy-oil": {
-            "advanced-oil-processing": 1.0
-         },
-         "light-oil": {
-            "heavy-oil-cracking": 1.0
-         },
-         "solid-fuel": {
-            "solid-fuel-from-petroleum-gas": 1.0
-         },
-         "uranium-235": {
-            "kovarex-enrichment-process": 1.0
-         },
-         "uranium-238": {
-            "uranium-processing": 1.0
-         }
+         "petroleum-gas": [
+            {"heavy-oil-cracking": "overproduction"},
+            {"light-oil-cracking": "overproduction"},
+            {"light-oil-cracking": 0.4359},
+            {"advanced-oil-processing": 0.5641}
+         ],
+         "heavy-oil": [
+            {"advanced-oil-processing": 1.0}
+         ],
+         "light-oil": [
+            {"heavy-oil-cracking": 1.0}
+         ],
+         "solid-fuel": [
+            {"solid-fuel-from-petroleum-gas": 1.0}
+         ],
+         "uranium-235": [
+            {"kovarex-enrichment-process": 1.0}
+         ],
+         "uranium-238":[
+            {"uranium-processing": 1.0}
+         ]
       },
       "factories": {
          "smelting": "electric-furnace",
