@@ -1,0 +1,41 @@
+{
+   "requested": {
+      "production-science-pack": 0.5,
+      "automation-science-pack": 0.5,
+      "logistic-science-pack": 0.5,
+      "chemical-science-pack": 0.5,
+      "military-science-pack": 0.5,
+      "utility-science-pack": 0.5,
+      "space-science-pack": 0.5
+   },
+   "preferencies": {
+      "recipes": {
+         "petroleum-gas": {
+            "light-oil-cracking": 0.4359,
+            "advanced-oil-processing": 0.5641
+         },
+         "heavy-oil": {
+            "advanced-oil-processing": 1.0
+         },
+         "light-oil": {
+            "heavy-oil-cracking": 1.0
+         },
+         "solid-fuel": {
+            "solid-fuel-from-petroleum-gas": 1.0
+         },
+         "uranium-235": {
+            "kovarex-enrichment-process": 1.0
+         },
+         "uranium-238": {
+            "uranium-processing": 1.0
+         }
+      },
+      "factories": {
+         "smelting": "electric-furnace",
+         "basic-crafting": "assembling-machine-2",
+         "crafting": "assembling-machine-2",
+         "advanced-crafting": "assembling-machine-2",
+         "crafting-with-fluid": "assembling-machine-2"
+      }
+   }
+}

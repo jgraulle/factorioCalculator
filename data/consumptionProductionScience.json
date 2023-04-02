@@ -1,12 +1,6 @@
 {
    "requested": {
-      "production-science-pack": 0.5,
-      "automation-science-pack": 0.5,
-      "logistic-science-pack": 0.5,
-      "chemical-science-pack": 0.5,
-      "military-science-pack": 0.5,
-      "utility-science-pack": 0.5,
-      "space-science-pack": 0.5
+      "production-science-pack": 0.5
    },
    "preferencies": {
       "recipes": {

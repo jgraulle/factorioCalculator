@@ -348,13 +348,28 @@ def loadConsumptionData(consumptionDataJsonFilePath) -> tuple[dict, dict, dict[s
     return consumptionDataJson["requested"], consumptionDataJson["preferencies"]["recipes"], consumptionDataJson["preferencies"]["factories"]
 
 
-def computeConsumptionRates(recipesByResult: RecipesByResult, requestedRates: dict, craftingFactoriesByName: CraftingFactoriesByName, factoriesPreferences: dict) -> tuple[dict,dict]:
+def computeConsumptionRates(recipesByResult: RecipesByResult, requestedRates: dict, craftingFactoriesByName: CraftingFactoriesByName, factoriesPreferences: dict) -> tuple[dict, dict, dict]:
     craftingFactoriesByCategories = craftingFactoriesByName2CraftingFactoriesByCategories(craftingFactoriesByName, factoriesPreferences)
     consumptionRate = {}
     noRecipes = {}
+    overproduction = {}
     while len(requestedRates)>0:
         requestedName, requestedRate = requestedRates.popitem()
-        if requestedRate > 0.0 and requestedName in recipesByResult:
+        if math.isclose(requestedRate, 0.0, abs_tol=0.0001):
+            continue
+        elif requestedRate < 0.0:
+            if requestedName not in overproduction:
+                overproduction[requestedName] = 0.0
+            overproduction[requestedName] += requestedRate
+        elif requestedName in recipesByResult:
+            if requestedName in overproduction:
+                requestedRate += overproduction[requestedName]
+                del overproduction[requestedName]
+                if math.isclose(requestedRate, 0.0, abs_tol=0.01):
+                    continue
+                elif requestedRate < 0.0:
+                    overproduction[requestedName] = requestedRate
+                    continue
             for ratio, recipe in recipesByResult[requestedName]:
                 productionCount = requestedRate / (recipe.results[requestedName] / recipe.time) * ratio
                 if recipe.name not in consumptionRate:
@@ -382,11 +397,11 @@ def computeConsumptionRates(recipesByResult: RecipesByResult, requestedRates: di
                     if ingredientName not in requestedRates:
                         requestedRates[ingredientName] = 0.0
                     requestedRates[ingredientName] += ingredientRate
-        elif not math.isclose(requestedRate, 0.0, abs_tol=0.01):
+        else:
             if requestedName not in noRecipes:
                 noRecipes[requestedName] = 0.0
             noRecipes[requestedName] += requestedRate
-    return consumptionRate, noRecipes
+    return consumptionRate, noRecipes, overproduction
 
 
 def craftingFactoriesByName2CraftingFactoriesByCategories(craftingFactoriesByName: CraftingFactoriesByName, factoriesPreferences: dict) -> CraftingFactoriesByCategories:
@@ -419,7 +434,7 @@ def toSiSuffix(quantity: float) -> tuple[float, str]:
     return quantity, ""
 
 
-def consumption2Html(consumptionRate:dict, requesteds:dict, htmlFilePath: string, itemsPngCopyFolderPath: string):
+def consumption2Html(consumptionRate:dict, noRecipes:dict, overproduction: dict, htmlFilePath: string, itemsPngCopyFolderPath: string):
     electricTotal = 0.0
     consumptionRate = dict(sorted(consumptionRate.items()))
     doc, tag, text = yattag.Doc().tagtext()
@@ -475,7 +490,12 @@ def consumption2Html(consumptionRate:dict, requesteds:dict, htmlFilePath: string
                 with tag('tr'):
                     with tag('th'):
                         text("base")
-                for ingredientName, ingredientRate in requesteds.items():
+                for ingredientName, ingredientRate in noRecipes.items():
+                    with tag('tr'):
+                        with tag('td', align="right"):
+                            text("{:.3f}".format(ingredientRate))
+                            doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, ingredientName+".png"), alt=ingredientName, title=ingredientName)
+                for ingredientName, ingredientRate in overproduction.items():
                     with tag('tr'):
                         with tag('td', align="right"):
                             text("{:.3f}".format(ingredientRate))
@@ -562,8 +582,8 @@ if __name__ == '__main__':
         itemsPngCopyFolderPath = os.path.join(os.path.dirname(args.consumption), "img")
         itemsPngCopyFolderPathes.add(itemsPngCopyFolderPath)
         recipesByResult = recipesByName2recipesByResult(recipes, recipesPreferences)
-        consumption, requestedRates = computeConsumptionRates(recipesByResult, requestedRates, craftingFactoriesByName, factoriesPreferences)
-        consumption2Html(consumption, requestedRates, args.consumption, "img")
+        consumption, noRecipes, overproduction = computeConsumptionRates(recipesByResult, requestedRates, craftingFactoriesByName, factoriesPreferences)
+        consumption2Html(consumption, noRecipes, overproduction, args.consumption, "img")
 
     if args.groups:
         recipesGroups = loadGroups(args.groups)
