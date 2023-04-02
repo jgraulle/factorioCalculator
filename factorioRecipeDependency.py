@@ -64,62 +64,64 @@ def getRecipes(factoriopath:string, recipesToRemove:set) -> Recipes:
             raise ValueError("Invalid recipe type for \"{}\"".format(recipeName))
         # Get category
         recipeCategory = "basic-crafting"
-        if recipeLua[index]["category"] != None:
+        if "category" in recipeLua[index]:
             recipeCategory = recipeLua[index]["category"]
         # Get lua recipe ingrediants
         ingredients = {}
-        if recipeLua[index]["ingredients"] != None:
+        if "ingredients" in recipeLua[index]:
             ingredientsLua = recipeLua[index]["ingredients"]
-        elif recipeLua[index]["normal"]["ingredients"] != None:
+        elif "ingredients" in recipeLua[index]["normal"]:
             ingredientsLua = recipeLua[index]["normal"]["ingredients"]
         else:
             raise ValueError("No ingredients found for \"{}\"".format(recipeName))
         # Convert lua recipe ingrediants into python
         for indexIngredient in range(1, len(ingredientsLua)+1):
 
-            if ingredientsLua[indexIngredient][1] != None:
+            if 1 in ingredientsLua[indexIngredient]:
                 ingredientName = ingredientsLua[indexIngredient][1]
-            elif ingredientsLua[indexIngredient]["name"] != None:
+            elif "name" in ingredientsLua[indexIngredient]:
                 ingredientName = ingredientsLua[indexIngredient]["name"]
             else:
                 raise ValueError("No ingredient name found for \"{}\" at {}".format(recipeName, indexIngredient))
-            if ingredientsLua[indexIngredient][2] != None:
+            if 2 in ingredientsLua[indexIngredient]:
                 ingredientAmount = ingredientsLua[indexIngredient][2]
-            elif ingredientsLua[indexIngredient]["amount"] != None:
+            elif "amount" in ingredientsLua[indexIngredient]:
                 ingredientAmount = ingredientsLua[indexIngredient]["amount"]
             else:
                 raise ValueError("No ingredient amount found for \"{}\" at {}".format(recipeName, indexIngredient))
             ingredients[ingredientName] = ingredientAmount
         # Get optional recipe energy required
-        time = recipeLua[index]["energy_required"]
-        if time == None:
-            time = 0.5
+        time = 0.5
+        if "energy_required" in recipeLua[index]:
+            time = recipeLua[index]["energy_required"]
+        elif "normal" in recipeLua[index] and "energy_required" in recipeLua[index]["normal"]:
+            time = recipeLua[index]["normal"]["energy_required"]
         # Get recipe result
         results = {}
-        if recipeLua[index]["result"] != None:
+        if "result" in recipeLua[index]:
             resultCount = 1
-            if recipeLua[index]["result_count"] != None:
+            if "result_count" in recipeLua[index]:
                 resultCount = recipeLua[index]["result_count"]
             results[recipeLua[index]["result"]] = resultCount
-        elif recipeLua[index]["results"] != None:
+        elif "results" in recipeLua[index]:
             for indexResult in range(1, len(recipeLua[index]["results"])+1):
-                if recipeLua[index]["results"][indexResult]["name"] != None:
+                if "name" in recipeLua[index]["results"][indexResult]:
                     resultName = recipeLua[index]["results"][indexResult]["name"]
                 elif recipeLua[index]["results"][indexResult][1] != None:
                     resultName = recipeLua[index]["results"][indexResult][1]
                 else:
                     raise ValueError("No result name found for \"{}\" at {}".format(recipeName, indexResult))
                 resultAmount = recipeLua[index]["results"][indexResult]["amount"]
-                if recipeLua[index]["results"][indexResult]["amount"] != None:
+                if "amount" in recipeLua[index]["results"][indexResult]:
                     resultAmount = recipeLua[index]["results"][indexResult]["amount"]
                 elif recipeLua[index]["results"][indexResult][2] != None:
                     resultAmount = recipeLua[index]["results"][indexResult][2]
                 else:
                     raise ValueError("No result amount found for \"{}\" at {}".format(recipeName, indexResult))
                 results[resultName] = resultAmount
-        elif recipeLua[index]["normal"]["result"] != None:
+        elif "result" in recipeLua[index]["normal"]:
             resultCount = 1
-            if recipeLua[index]["normal"]["result_count"] != None:
+            if "result_count" in recipeLua[index]["normal"]:
                 resultCount = recipeLua[index]["normal"]["result_count"]
             results[recipeLua[index]["normal"]["result"]] = resultCount
         else:
