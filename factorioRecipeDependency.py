@@ -348,7 +348,8 @@ def loadConsumptionData(consumptionDataJsonFilePath) -> tuple[dict, dict, dict[s
     return consumptionDataJson["requested"], consumptionDataJson["preferencies"]["recipes"], consumptionDataJson["preferencies"]["factories"]
 
 
-def computeConsumptionRates(recipesByResult: RecipesByResult, requestedRates: dict) -> tuple[dict,dict]:
+def computeConsumptionRates(recipesByResult: RecipesByResult, requestedRates: dict, craftingFactoriesByName: CraftingFactoriesByName, factoriesPreferences: dict) -> tuple[dict,dict]:
+    craftingFactoriesByCategories = craftingFactoriesByName2CraftingFactoriesByCategories(craftingFactoriesByName, factoriesPreferences)
     consumptionRate = {}
     noRecipes = {}
     while len(requestedRates)>0:
@@ -357,8 +358,11 @@ def computeConsumptionRates(recipesByResult: RecipesByResult, requestedRates: di
             for ratio, recipe in recipesByResult[requestedName]:
                 productionCount = requestedRate / (recipe.results[requestedName] / recipe.time) * ratio
                 if recipe.name not in consumptionRate:
-                    consumptionRate[recipe.name] = {"productionCount": 0.0, "category": recipe.category, "results": {}, "ingredients": {}}
-                consumptionRate[recipe.name]["productionCount"] += productionCount
+                    consumptionRate[recipe.name] = {"production-count": 0.0, "factories-name": craftingFactoriesByCategories[recipe.category].name, "factories-count": 0.0, "electric-consumption": 0.0, "category": recipe.category, "results": {}, "ingredients": {}}
+                consumptionRate[recipe.name]["production-count"] += productionCount
+                consumptionRate[recipe.name]["factories-count"] += productionCount / craftingFactoriesByCategories[recipe.category].speed
+                if craftingFactoriesByCategories[recipe.category].consumptionType == "electric":
+                    consumptionRate[recipe.name]["electric-consumption"] = consumptionRate[recipe.name]["factories-count"] * craftingFactoriesByCategories[recipe.category].consumptionQuantity
                 for resultName, resultPerProduction in recipe.results.items():
                     resultRate = resultPerProduction / recipe.time * productionCount
                     if resultName not in consumptionRate[recipe.name]["results"]:
@@ -400,7 +404,24 @@ def craftingFactoriesByName2CraftingFactoriesByCategories(craftingFactoriesByNam
     return craftingFactoriesByCategories
 
 
-def consumption2Html(consumptionRate:dict, requesteds:dict, craftingFactoriesByCategories: CraftingFactoriesByCategories, htmlFilePath: string, itemsPngCopyFolderPath: string):
+def toSiSuffix(quantity: float) -> tuple[float, str]:
+    exponent = int(math.log10(quantity));
+    if exponent>=15:
+        return quantity/1.0e15, "P"
+    if exponent>=12:
+        return quantity/1.0e12, "T"
+    if exponent>=9:
+        return quantity/1.0e9, "G"
+    if exponent>=6:
+        return quantity/1.0e6, "M"
+    if exponent>=3:
+        return quantity/1.0e3, "k"
+    return quantity, ""
+
+
+def consumption2Html(consumptionRate:dict, requesteds:dict, htmlFilePath: string, itemsPngCopyFolderPath: string):
+    electricTotal = 0.0
+    consumptionRate = dict(sorted(consumptionRate.items()))
     doc, tag, text = yattag.Doc().tagtext()
     with tag('html'):
         with tag("head"):
@@ -415,28 +436,40 @@ def consumption2Html(consumptionRate:dict, requesteds:dict, craftingFactoriesByC
                         text("factory count")
                     with tag('th'):
                         text("ingredients")
+                    with tag('th'):
+                        text("electricity")
                 for production in consumptionRate.values():
                     with tag('tr'):
-                        with tag('td'):
+                        with tag('td', align="right"):
                             isFirst = True
                             for resultName, resultRate in production["results"].items():
                                 if not isFirst:
                                     text(" + ")
-                                text("{:.2f}".format(resultRate))
+                                text("{:.3f}".format(resultRate))
                                 isFirst = False
                                 doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, resultName+".png"), alt=resultName, title=resultName)
-                        with tag('td'):
-                            craftingFactory = craftingFactoriesByCategories[production["category"]]
-                            text("{:.1f}".format(production["productionCount"]/craftingFactory.speed))
-                            doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, craftingFactory.name+".png"), alt=craftingFactory.name, title=craftingFactory.name)
-                        with tag('td'):
+                        with tag('td', align="right"):
+                            text("{:.1f}".format(production["factories-count"]))
+                            doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, production["factories-name"]+".png"), alt=production["factories-name"], title=production["factories-name"])
+                        with tag('td', align="right"):
                             isFirst = True
                             for ingredientName, ingredientRate in production["ingredients"].items():
                                 if not isFirst:
                                     text(" + ")
-                                text("{:.2f}".format(ingredientRate))
+                                text("{:.3f}".format(ingredientRate))
                                 isFirst = False
                                 doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, ingredientName+".png"), alt=ingredientName, title=ingredientName)
+                        with tag('td', align="right"):
+                            electric, suffix = toSiSuffix(production["electric-consumption"])
+                            text("{:.1f}{}W".format(electric, suffix))
+                            electricTotal += production["electric-consumption"]
+                with tag('tr'):
+                    doc.stag('td')
+                    doc.stag('td')
+                    doc.stag('td')
+                    with tag('td', align="right"):
+                        electric, suffix = toSiSuffix(electricTotal)
+                        text("{:.1f}{}W".format(electric, suffix))
             doc.stag('br')
             with tag('table'):
                 with tag('tr'):
@@ -444,10 +477,9 @@ def consumption2Html(consumptionRate:dict, requesteds:dict, craftingFactoriesByC
                         text("base")
                 for ingredientName, ingredientRate in requesteds.items():
                     with tag('tr'):
-                        with tag('td'):
-                            text("{:.2f}".format(ingredientRate))
+                        with tag('td', align="right"):
+                            text("{:.3f}".format(ingredientRate))
                             doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, ingredientName+".png"), alt=ingredientName, title=ingredientName)
-
     html = doc.getvalue()
     with open(htmlFilePath, "wb") as htmlFile:
         htmlFile.write(bytes(html, "utf8"))
@@ -525,9 +557,8 @@ if __name__ == '__main__':
         itemsPngCopyFolderPath = os.path.join(os.path.dirname(args.consumption), "img")
         itemsPngCopyFolderPathes.add(itemsPngCopyFolderPath)
         recipesByResult = recipesByName2recipesByResult(recipes, recipesPreferences)
-        consumption, requestedRates = computeConsumptionRates(recipesByResult, requestedRates)
-        craftingFactoriesByCategories = craftingFactoriesByName2CraftingFactoriesByCategories(craftingFactoriesByName, factoriesPreferences)
-        consumption2Html(consumption, requestedRates, craftingFactoriesByCategories, args.consumption, "img")
+        consumption, requestedRates = computeConsumptionRates(recipesByResult, requestedRates, craftingFactoriesByName, factoriesPreferences)
+        consumption2Html(consumption, requestedRates, args.consumption, "img")
 
     if args.groups:
         recipesGroups = loadGroups(args.groups)
