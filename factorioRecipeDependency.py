@@ -162,10 +162,12 @@ def removeLeafe(recipes: Recipes):
     for recipe in recipes.values():
         for ingredientName in recipe.ingredients.keys():
             itemUsedAsIngredient.add(ingredientName)
-    for recipe in recipes.values():
-        for resultName in list(recipe.results.keys()):
+    for recipeName in list(recipes.keys()):
+        for resultName in list(recipes[recipeName].results.keys()):
             if resultName not in itemUsedAsIngredient:
-                del recipe.results[resultName]
+                del recipes[recipeName].results[resultName]
+        if len(recipes[recipeName].results) == 0:
+            del recipes[recipeName]
 
 
 def itemPngPath(itemName: string, factoriopath: string) -> string:
