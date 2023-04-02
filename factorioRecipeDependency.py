@@ -2,7 +2,6 @@
 # ./factorioRecipeDependency.py ~/.steam/debian-installation/steamapps/common/Factorio/ -r small-electric-pole shotgun combat-shotgun wooden-chest basic-oil-processing coal-liquefaction heavy-oil-cracking light-oil-cracking -i steel-plate electronic-circuit iron-plate iron-gear-wheel advanced-circuit processing-unit copper-plate pipe -d out && (cd out && dot -Tsvg itemDependency.dot -o itemDependency.svg)
 # todo:
 # - declare named tuple for recipe
-# - can set ouput file name for dot and html
 
 
 import argparse
@@ -192,7 +191,7 @@ def itemsPngCopy(recipes: dict, factoriopath:string, dstFolderPath: string):
                 itemsName.add(resultName)
 
 
-def ingredientsByUsage2Html(ingredientsByUsage:dict, htmlFilePath: string):
+def ingredientsByUsage2Html(ingredientsByUsage:dict, htmlFilePath: string, itemsPngCopyFolderPath: string):
     doc, tag, text = yattag.Doc().tagtext()
     with tag('html'):
         with tag("head"):
@@ -210,23 +209,23 @@ def ingredientsByUsage2Html(ingredientsByUsage:dict, htmlFilePath: string):
                 for ingredientName, resultList in ingredientsByUsage.items():
                     with tag('tr'):
                         with tag('td'):
-                            doc.stag("img", src=ingredientName+".png", alt=ingredientName, title=ingredientName)
+                            doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, ingredientName+".png"), alt=ingredientName, title=ingredientName)
                         with tag('td'):
                             text(len(resultList))
                             with tag('td'):
                                 for resultName in resultList:
-                                    doc.stag("img", src=resultName+".png", alt=resultName, title=resultName)
+                                    doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, resultName+".png"), alt=resultName, title=resultName)
 
     html = doc.getvalue()
     with open(htmlFilePath, "wb") as htmlFile:
         htmlFile.write(bytes(html, "utf8"))
 
 
-def generateDot(ingredientsByUsage:dict, dotFilePath: string):
+def generateDot(ingredientsByUsage:dict, dotFilePath: string, itemsPngCopyFolderPath: string):
     def convertItemName(name:str):
         return name.replace("-", "_").replace(" ", "_ ")
     def generateNode(ingredientName:str) -> str:
-        return '   {0} [shape=none, label="", image="{1}.png"];\n'.format(convertItemName(ingredientName), ingredientName)
+        return '   {0} [shape=none, label="", image="{1}.png"];\n'.format(convertItemName(ingredientName), os.path.join(itemsPngCopyFolderPath, ingredientName))
     with open(dotFilePath, "w") as dotFile:
         dotFile.write("digraph {\n")
         itemsName = set()
@@ -257,8 +256,8 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--items', type=str, nargs='+', help="To remove items list by ingredients or result name")
     parser.add_argument('-l', '--leafe', action="store_true", help="To remove items at the end of the tree")
     parser.add_argument('-j', '--json', type=argparse.FileType('w'), help="Generate a recipe json file with the given file name")
-    parser.add_argument('-u', '--usage', type=str, help="Generate a HTML page with for each ingredient the usage")
-    parser.add_argument('-d', '--dot', type=str, help="Generate a graphviz dot file in the folder path")
+    parser.add_argument('-u', '--usage', type=str, help="Generate the given HTML page with for each ingredient the usage")
+    parser.add_argument('-d', '--dot', type=str, help="Generate the given graphviz dot file in the folder path")
     args = parser.parse_args()
 
     factorioVersion = getVersion(args.factoriopath)
@@ -273,7 +272,7 @@ if __name__ == '__main__':
     recipes = getRecipes(args.factoriopath, recipesToRemove)
     if args.items != None:
         recipesRemoveItem(recipes, set(args.items))
-    itemsPngCopyFolderPath = set()
+    itemsPngCopyFolderPathes = set()
 
     if args.leafe:
         removeLeafe(recipes)
@@ -284,12 +283,16 @@ if __name__ == '__main__':
 
     if args.usage:
         usage = ingredientsByUsage(recipes)
-        itemsPngCopyFolderPath.add(args.usage)
-        ingredientsByUsage2Html(usage, os.path.join(args.usage, "ingredientsByUsage.html"))
+        itemsPngCopyFolderPath = os.path.join(os.path.dirname(args.usage), "img")
+        itemsPngCopyFolderPathes.add(itemsPngCopyFolderPath)
+        ingredientsByUsage2Html(usage, args.usage, "img")
 
     if args.dot:
-        itemsPngCopyFolderPath.add(args.dot)
-        generateDot(recipes, os.path.join(args.dot, "itemDependency.dot"))
+        itemsPngCopyFolderPath = os.path.join(os.path.dirname(args.dot), "img")
+        itemsPngCopyFolderPathes.add(itemsPngCopyFolderPath)
+        generateDot(recipes, args.dot, "img")
 
-    for folderPath in itemsPngCopyFolderPath:
+    for folderPath in itemsPngCopyFolderPathes:
+        if not os.path.exists(folderPath):
+            os.makedirs(folderPath)
         itemsPngCopy(recipes, args.factoriopath, folderPath)
