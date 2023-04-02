@@ -27,7 +27,7 @@ out/recipesAllUsage.html: out/recipesAll.json factorioRecipeDependency.py
 	./factorioRecipeDependency.py --open $< --usage $@
 
 out/recipesAllConso.html: out/recipesAll.json factorioRecipeDependency.py
-	./factorioRecipeDependency.py --open $< --conso $@
+	./factorioRecipeDependency.py --open $< --conso $@ --factories data/factories.json
 
 /tmp/recipes%.json: out/recipesAll.json data/recipesGroups.json factorioRecipeDependency.py
 	./factorioRecipeDependency.py --open $< --groups data/recipesGroups.json --groupspath /tmp/

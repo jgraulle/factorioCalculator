@@ -20,6 +20,14 @@ class Recipe(NamedTuple):
 Recipes = dict[str, Recipe]
 
 
+class CraftingFactory(NamedTuple):
+    consumptionType: str
+    consumptionQuantity: int
+    speed: float
+    categories: str
+CraftingFactories = dict[str, CraftingFactory]
+
+
 def getVersion(factoriopath:string) -> string:
     # Read info.json file
     with open(os.path.join(factoriopath, "data", "base", "info.json")) as infoFile:
@@ -287,41 +295,66 @@ def generateDot(recipes: Recipes, dotFilePath: string, itemsPngCopyFolderPath: s
         dotFile.write("}\n")
 
 
-def generateConso(recipes: Recipes, requesteds: dict, htmlFilePath: string, itemsPngCopyFolderPath: string) -> tuple[dict,dict]:
+def loadFactories(factoriesJsonFilePath: string) -> CraftingFactories:
+    with open(factoriesJsonFilePath, 'r') as jsonFile:
+        jsonFactories = json.load(jsonFile)
+    craftingFactories = {}
+    for factoryName, jsonFactory in jsonFactories.items():
+        if "crafting" in jsonFactory:
+            craftingFactories[factoryName] = CraftingFactory(jsonFactory["consumption"]["type"],
+                                                             jsonFactory["consumption"]["quantity"],
+                                                             jsonFactory["crafting"]["speed"],
+                                                             jsonFactory["crafting"]["categories"])
+    return craftingFactories
+
+
+def generateConso(recipes: Recipes, requesteds: dict) -> tuple[dict,dict]:
     conso = {}
     isNewRequested = True
-    counter = 0
     while isNewRequested:
         isNewRequested = False
-        counter += 1
         for recipeName, recipe in recipes.items():
-            factoryCount = 0
+            productionCount = 0.0
             for resultName, resultCount in recipe.results.items():
-                if resultName in requesteds:
-                    factoryUnitProduction = 1.0/recipe.time*resultCount
-                    factoryCount = max(requesteds[resultName] / factoryUnitProduction, factoryCount)
-            if factoryCount > 0:
+                if resultName in requesteds and requesteds[resultName]>0.0:
+                    quantityPerProduction = 1.0/recipe.time*resultCount
+                    productionCount = max(requesteds[resultName] / quantityPerProduction, productionCount)
+            if productionCount > 0.0:
                 if recipeName not in conso:
-                    conso[recipeName] = {"factoryCount": math.ceil(factoryCount), "results": {}, "ingredients": {}}
+                    conso[recipeName] = {"productionCount": 0.0, "category": recipe.category, "results": {}, "ingredients": {}}
+                conso[recipeName]["productionCount"] += productionCount
+                if recipeName == "":
+                    print("{:.2f} += {:.2f} => {:.2f}".format(recipeName, productionCount, conso[recipeName]["productionCount"]))
                 for resultName, resultCount in recipe.results.items():
+                    resultProduction = 1.0 / recipe.time * resultCount * productionCount
                     if resultName not in conso[recipeName]["results"]:
                         conso[recipeName]["results"][resultName] = 0.0
-                    conso[recipeName]["results"][resultName] += 1.0 / recipe.time * resultCount * factoryCount
-                    if resultName in requesteds:
+                    conso[recipeName]["results"][resultName] += resultProduction
+                    if resultName not in requesteds:
+                        requesteds[resultName] = 0.0
+                    requesteds[resultName] -= resultProduction
+                    if requesteds[resultName] == 0.0:
                         del requesteds[resultName]
                 for ingredientName, ingredientCount in recipe.ingredients.items():
-                    ingredientConso = 1.0 / recipe.time * ingredientCount * factoryCount
-                    if conso[recipeName]["results"][resultName] not in conso[recipeName]["ingredients"]:
+                    ingredientConsumption = 1.0 / recipe.time * ingredientCount * productionCount
+                    if ingredientName not in conso[recipeName]["ingredients"]:
                         conso[recipeName]["ingredients"][ingredientName] = 0.0
-                    conso[recipeName]["ingredients"][ingredientName] += ingredientConso
+                    conso[recipeName]["ingredients"][ingredientName] += ingredientConsumption
                     if ingredientName not in requesteds:
                         requesteds[ingredientName] = 0.0
-                    requesteds[ingredientName] += 1.0 / recipe.time * ingredientCount * factoryCount
-                    isNewRequested = True
+                    requesteds[ingredientName] += ingredientConsumption
+                isNewRequested = True
     return conso,requesteds
 
 
-def conso2Html(conso:dict, requesteds:dict, htmlFilePath: string, itemsPngCopyFolderPath: string):
+def category2Factory(category: str, craftingFactories: CraftingFactories) -> tuple[str, CraftingFactory]:
+    for name, craftingFactory in craftingFactories.items():
+        if category in craftingFactory.categories:
+            return name, craftingFactory
+    return None
+
+
+def conso2Html(conso:dict, requesteds:dict, craftingFactories: CraftingFactories, htmlFilePath: string, itemsPngCopyFolderPath: string):
     doc, tag, text = yattag.Doc().tagtext()
     with tag('html'):
         with tag("head"):
@@ -331,22 +364,32 @@ def conso2Html(conso:dict, requesteds:dict, htmlFilePath: string, itemsPngCopyFo
             with tag('table'):
                 with tag('tr'):
                     with tag('th'):
-                        text("factory count")
-                    with tag('th'):
                         text("result")
+                    with tag('th'):
+                        text("factory count")
                     with tag('th'):
                         text("ingredients")
                 for production in conso.values():
                     with tag('tr'):
                         with tag('td'):
-                            text(production["factoryCount"])
-                        with tag('td'):
+                            isFirst = True
                             for resultName, resultRate in production["results"].items():
-                                text(" + {:.2f}".format(resultRate))
+                                if not isFirst:
+                                    text(" + ")
+                                text("{:.2f}".format(resultRate))
+                                isFirst = False
                                 doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, resultName+".png"), alt=resultName, title=resultName)
                         with tag('td'):
+                            craftingFactoryName, craftingFactory = category2Factory(production["category"], craftingFactories)
+                            text("{:.1f}".format(production["productionCount"]/craftingFactory.speed))
+                            doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, craftingFactoryName+".png"), alt=craftingFactoryName, title=craftingFactoryName)
+                        with tag('td'):
+                            isFirst = True
                             for ingredientName, ingredientRate in production["ingredients"].items():
-                                text(" + {:.2f}".format(ingredientRate))
+                                if not isFirst:
+                                    text(" + ")
+                                text("{:.2f}".format(ingredientRate))
+                                isFirst = False
                                 doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, ingredientName+".png"), alt=ingredientName, title=ingredientName)
             doc.stag('br')
             with tag('table'):
@@ -382,6 +425,7 @@ if __name__ == '__main__':
     parser.add_argument('-u', '--usage', type=argparse.FileType('w'), help="Generate the given HTML page with for each ingredient the usage")
     parser.add_argument('-d', '--dot', type=argparse.FileType('w'), help="Generate the given graphviz dot file in the folder path")
     parser.add_argument('-c', '--conso', type=argparse.FileType('w'), help="Generate the given HTML page with for each recipes the consume quantity")
+    parser.add_argument('-a', '--factories', type=argparse.FileType('r'), help="Factories data used when generate consume quantity")
     parser.add_argument('-g', '--groups', type=argparse.FileType('r'), help="Generate a json recipe file for each group in the given file")
     parser.add_argument('-p', '--groupspath', type=str, help="folder path to generate recipe file from group")
     args = parser.parse_args()
@@ -425,10 +469,13 @@ if __name__ == '__main__':
         generateDot(recipes, args.dot.name, "img")
 
     if args.conso:
+        if not args.factories:
+            raise ValueError("To generate consumtion you need to provide factories file")
+        craftingFactories = loadFactories(args.factories.name)
         itemsPngCopyFolderPath = os.path.join(os.path.dirname(args.conso.name), "img")
         itemsPngCopyFolderPathes.add(itemsPngCopyFolderPath)
-        conso,requesteds = generateConso(recipes, {"production-science-pack": 0.5}, args.conso.name, "img")
-        conso2Html(conso, requesteds, args.conso.name, "img")
+        conso,requesteds = generateConso(recipes, {"production-science-pack": 0.5})
+        conso2Html(conso, requesteds, craftingFactories, args.conso.name, "img")
 
     if args.groups:
         recipesGroups = loadGroups(args.groups.name)

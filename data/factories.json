@@ -1,0 +1,208 @@
+{
+   "transport-belt": {
+      "transport" : {
+         "speed": 15
+      }
+   },
+   "fast-transport-belt": {
+      "transport" : {
+         "speed": 30
+      }
+   },
+   "express-transport-belt": {
+      "transport" : {
+         "speed": 45
+      }
+   },
+   "steam-engine": {
+      "production": {
+         "type": "electric",
+         "quantity": 900000
+      }
+   },
+   "solar-panel": {
+      "production": {
+         "type": "electric",
+         "quantity": 60000
+      }
+   },
+   "steam-turbine": {
+      "production": {
+         "type": "electric",
+         "quantity": 5820000
+      }
+   },
+   "burner-mining-drill": {
+      "consumption": {
+         "type": "burner",
+         "quantity": 150000
+      },
+      "production": {
+         "type": "mining",
+         "quantity": 0.25
+      }
+   },
+   "electric-mining-drill": {
+      "consumption": {
+         "type": "electric",
+         "quantity": 90000
+      },
+      "production": {
+         "type": "mining",
+         "quantity": 0.5
+      }
+   },
+   "offshore-pump": {
+      "production": {
+         "type": "water",
+         "quantity": 20
+      }
+   },
+   "pumpjack": {
+      "consumption": {
+         "type": "electric",
+         "quantity": 90000
+      },
+      "production": {
+         "type": "crude-oil"
+      }
+   },
+   "stone-furnace": {
+      "consumption": {
+         "type": "burner",
+         "quantity": 90000
+      },
+      "crafting": {
+         "speed": 1.0,
+         "categories": ["smelting"]
+      }
+   },
+   "steel-furnace": {
+      "consumption": {
+         "type": "burner",
+         "quantity": 90000
+      },
+      "crafting": {
+         "speed": 2.0,
+         "categories": ["smelting"]
+      }
+   },
+   "electric-furnace": {
+      "consumption": {
+         "type": "electric",
+         "quantity": 180000
+      },
+      "crafting": {
+         "speed": 2.0,
+         "categories": ["smelting"]
+      },
+      "module": {
+         "slots": 2,
+         "allowed_effects": ["consumption", "speed", "productivity", "pollution"]
+      }
+   },
+   "assembling-machine-1": {
+      "consumption": {
+         "type": "electric",
+         "quantity": 75000
+      },
+      "crafting": {
+         "speed": 0.5,
+         "categories": ["basic-crafting", "crafting", "advanced-crafting"]
+      }
+   },
+   "assembling-machine-2": {
+      "consumption": {
+         "type": "electric",
+         "quantity": 150000
+      },
+      "crafting": {
+         "speed": 0.75,
+         "categories": ["basic-crafting", "crafting", "advanced-crafting", "crafting-with-fluid"]
+      },
+      "module": {
+         "slots": 2,
+         "allowed_effects": ["consumption", "speed", "productivity", "pollution"]
+      }
+   },
+   "assembling-machine-3": {
+      "consumption": {
+         "type": "electric",
+         "quantity": 375000
+      },
+      "crafting": {
+         "speed": 1.25,
+         "categories": ["basic-crafting", "crafting", "advanced-crafting", "crafting-with-fluid"]
+      },
+      "module": {
+         "slots": 4,
+         "allowed_effects": ["consumption", "speed", "productivity", "pollution"]
+      }
+   },
+   "oil-refinery": {
+      "consumption": {
+         "type": "electric",
+         "quantity": 420000
+      },
+      "crafting": {
+         "speed": 1,
+         "categories": ["oil-processing"]
+      },
+      "module": {
+         "slots": 3,
+         "allowed_effects": ["consumption", "speed", "productivity", "pollution"]
+      }
+   },
+   "chemical-plant": {
+      "consumption": {
+         "type": "electric",
+         "quantity": 210000
+      },
+      "crafting": {
+         "speed": 1,
+         "categories": ["chemistry"]
+      },
+      "module": {
+         "slots": 3,
+         "allowed_effects": ["consumption", "speed", "productivity", "pollution"]
+      }
+   },
+   "centrifuge": {
+      "consumption": {
+         "type": "electric",
+         "quantity": 350000
+      },
+      "crafting": {
+         "speed": 1,
+         "categories": ["centrifuging"]
+      },
+      "module": {
+         "slots": 2,
+         "allowed_effects": ["consumption", "speed", "productivity", "pollution"]
+      }
+   },
+   "rocket-silo": {
+      "consumption": {
+         "type": "electric",
+         "quantity": 250000
+      },
+      "crafting": {
+         "speed": 1,
+         "categories": ["rocket-building"]
+      },
+      "module": {
+         "slots": 4,
+         "allowed_effects": ["consumption", "speed", "productivity", "pollution"]
+      }
+   },
+   "lab": {
+      "consumption": {
+         "type": "electric",
+         "quantity": 60000
+      },
+      "module": {
+         "slots": 2,
+         "allowed_effects": ["consumption", "speed", "productivity", "pollution"]
+      }
+   }
+}
