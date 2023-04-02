@@ -143,7 +143,7 @@ def recipesRemoveItem(recipes: Recipes, itemsToRemove):
 
 def writeJsonFile(data:dict, fileName:string):
     with open(fileName.name, 'w') as jsonFile:
-        json.dump(data, jsonFile, ensure_ascii=False, indent=3, )
+        json.dump(data, jsonFile, ensure_ascii=False, indent=3)
 
 
 def ingredientsByUsage(recipes: Recipes) -> dict:
