@@ -136,12 +136,16 @@ def getRecipes(factoriopath:string, recipesToRemove:set) -> RecipesByName:
     return recipes
 
 
+def fromJsonRecipe(recipeName: str, jsonRecipe: dict) -> Recipe:
+    return Recipe(recipeName, jsonRecipe["ingredients"], jsonRecipe["time"], jsonRecipe["results"], jsonRecipe["category"])
+
+
 def loadRecipes(jsonFilePath: string) -> RecipesByName:
     with open(jsonFilePath, 'r') as jsonFile:
         jsonRecipes = json.load(jsonFile)
     recipes = RecipesByName()
     for recipeName, jsonRecipe in jsonRecipes.items():
-        recipes[recipeName] = Recipe(recipeName, jsonRecipe["ingredients"], jsonRecipe["time"], jsonRecipe["results"], jsonRecipe["category"])
+        recipes[recipeName] = fromJsonRecipe(recipeName, jsonRecipe)
     return recipes
 
 
@@ -228,16 +232,9 @@ def keepOnlyLeafe(recipes: RecipesByName):
             del recipes[recipeName]
 
 
-def itemPngPath(itemName: string, factoriopath: string) -> string:
-    itemRenames = {"discharge-defense-remote": "discharge-defense-equipment-controller",
-                   "stone-wall": "wall",
-                   "defender-capsule": "defender",
-                   "distractor-capsule": "distractor",
-                   "destroyer-capsule": "destroyer",
-                   "raw-fish": "fish",
-                   "heat-exchanger":"heat-boiler"}
-    if itemName in itemRenames:
-        itemName = itemRenames[itemName]
+def itemPngPath(itemName: string, factoriopath: string, itemPngRenames: dict[str,str]) -> string:
+    if itemName in itemPngRenames:
+        itemName = itemPngRenames[itemName]
     filePathes = [os.path.join(factoriopath, "data", "base", "graphics", "icons", itemName+".png"),
                   os.path.join(factoriopath, "data", "base", "graphics", "icons", "fluid", itemName+".png"),
                   os.path.join(factoriopath, "data", "base", "graphics", "icons", "fluid", "barreling", itemName+".png")]
@@ -247,22 +244,22 @@ def itemPngPath(itemName: string, factoriopath: string) -> string:
     raise FileNotFoundError("PNG file for \"{}\" not found in factorio path \"{}\"".format(itemName, factoriopath))
 
 
-def itemPngCopy(itemName: string, factoriopath:string, dstFolderPath: string):
-    imgSrc = Image.open(itemPngPath(itemName, factoriopath))
+def itemPngCopy(itemName: string, factoriopath:string, dstFolderPath: string, itemPngRenames: dict[str,str]):
+    imgSrc = Image.open(itemPngPath(itemName, factoriopath, itemPngRenames))
     imgdst = imgSrc.crop((64, 0, 64+32, 32)) # left, upper, right, and lower 
     imgdst.save(os.path.join(dstFolderPath, itemName+".png"))
 
 
-def itemsPngCopy(recipes: RecipesByName, factoriopath:string, dstFolderPath: string):
+def itemsPngCopy(recipes: RecipesByName, factoriopath:string, dstFolderPath: string, itemPngRenames: dict[str,str]):
     itemsName = set()
     for recipe in recipes.values():
         for ingredientName in recipe.ingredients.keys():
             if ingredientName not in itemsName:
-                itemPngCopy(ingredientName, factoriopath, dstFolderPath)
+                itemPngCopy(ingredientName, factoriopath, dstFolderPath, itemPngRenames)
                 itemsName.add(ingredientName)
         for resultName in recipe.results.keys():
             if resultName not in itemsName:
-                itemPngCopy(resultName, factoriopath, dstFolderPath)
+                itemPngCopy(resultName, factoriopath, dstFolderPath, itemPngRenames)
                 itemsName.add(resultName)
 
 
@@ -328,18 +325,21 @@ def generateDot(recipes: RecipesByName, dotFilePath: string, itemsPngCopyFolderP
         dotFile.write("}\n")
 
 
-def loadFactories(factoriesJsonFilePath: string) -> CraftingFactoriesByName:
-    with open(factoriesJsonFilePath, 'r') as jsonFile:
-        jsonFactories = json.load(jsonFile)
+def loadFactorioData(factorioDataJsonFilePath: string) -> tuple[CraftingFactoriesByName, RecipesByName, set[str], dict[str,str]]:
+    with open(factorioDataJsonFilePath, 'r') as factorioDataJsonFile:
+        factorioDataJson = json.load(factorioDataJsonFile)
     craftingFactories = {}
-    for factoryName, jsonFactory in jsonFactories.items():
+    for factoryName, jsonFactory in factorioDataJson["factories"].items():
         if "crafting" in jsonFactory:
             craftingFactories[factoryName] = CraftingFactory(factoryName,
                                                              jsonFactory["consumption"]["type"],
                                                              jsonFactory["consumption"]["quantity"],
                                                              jsonFactory["crafting"]["speed"],
                                                              jsonFactory["crafting"]["categories"])
-    return craftingFactories
+    recipes = {}
+    for recipeName, jsonRecipe in factorioDataJson["recipes-to-add"].items():
+        recipes[recipeName] = fromJsonRecipe(recipeName, jsonRecipe)
+    return craftingFactories, recipes, set(factorioDataJson["recipes-to-remove"]), factorioDataJson["item-png-renames"]
 
 
 def loadConsumptionData(consumptionDataJsonFilePath) -> tuple[dict, dict, dict[str, str]]:
@@ -503,25 +503,27 @@ if __name__ == '__main__':
     parser.add_argument('-u', '--usage', type=pathlib.Path, help="Generate the given HTML page with for each ingredient the usage")
     parser.add_argument('-d', '--dot', type=pathlib.Path, help="Generate the given graphviz dot file in the folder path")
     parser.add_argument('-c', '--consumption', type=pathlib.Path, help="Generate the given HTML page with for each recipes the consume quantity")
-    parser.add_argument('-a', '--factories', type=pathlib.Path, help="Factories data used when generate consumption")
+    parser.add_argument('-a', '--factorioData', type=pathlib.Path, help="Recipes and factories data used when generate recipes and consumption")
     parser.add_argument('-s', '--consumptionData', type=pathlib.Path, help="Consumption requested and preferencies used when generate consumption")
     parser.add_argument('-g', '--groups', type=pathlib.Path, help="Generate a json recipe file for each group in the given file")
     parser.add_argument('-p', '--groupspath', type=pathlib.Path, help="folder path to generate recipe file from group")
     args = parser.parse_args()
 
     itemsPngCopyFolderPathes = set()
+    craftingFactoriesByName = {}
+    recipesToAdd = RecipesByName()
+    recipesToRemove = set()
+
+    if args.factorioData:
+        craftingFactoriesByName, recipesToAdd, recipesToRemove, itemPngRenames = loadFactorioData(args.factorioData)
 
     if args.factoriopath:
         factorioVersion = getVersion(args.factoriopath)
         print("Factorio version:", factorioVersion)
-        recipesToRemove = set()
         if args.recipes != None:
             recipesToRemove |= set(args.recipes)
-        if factorioVersion == "1.1.76":
-            recipesToRemove |= {"electric-energy-interface", "loader", "fast-loader", "express-loader"}
         recipes = getRecipes(args.factoriopath, recipesToRemove)
-        if factorioVersion == "1.1.76":
-            recipes["space-science-pack"] = Recipe("space-science-pack", {"rocket-part": 100, "satellite": 1}, 1.0, {"space-science-pack": 1000}, "rocket-building")
+        recipes.update(recipesToAdd)
 
     if args.open:
         recipes = loadRecipes(args.open)
@@ -554,11 +556,8 @@ if __name__ == '__main__':
         generateDot(recipes, args.dot, "img")
 
     if args.consumption:
-        if not args.factories:
-            raise ValueError("To generate consumtion you need to provide factories file")
         if not args.consumptionData:
             raise ValueError("To generate consumtion you need to provide consumption data file")
-        craftingFactoriesByName = loadFactories(args.factories)
         requestedRates, recipesPreferences, factoriesPreferences = loadConsumptionData(args.consumptionData)
         itemsPngCopyFolderPath = os.path.join(os.path.dirname(args.consumption), "img")
         itemsPngCopyFolderPathes.add(itemsPngCopyFolderPath)
@@ -581,4 +580,4 @@ if __name__ == '__main__':
         for folderPath in itemsPngCopyFolderPathes:
             if not os.path.exists(folderPath):
                 os.makedirs(folderPath)
-            itemsPngCopy(recipes, args.factoriopath, folderPath)
+            itemsPngCopy(recipes, args.factoriopath, folderPath, itemPngRenames)

@@ -20,14 +20,14 @@ all: out/recipesRobotAll.svg out/recipesBeltInserterAll.svg \
 out/%.svg: /tmp/%.dot
 	cd out && dot -Tsvg $< -o ../$@
 
-out/recipesAll.json: factorioRecipeDependency.py
-	./factorioRecipeDependency.py --factoriopath ~/.steam/debian-installation/steamapps/common/Factorio/ --json $@
+out/recipesAll.json: factorioRecipeDependency.py data/factorio-1.1.76.json
+	./factorioRecipeDependency.py --factoriopath ~/.steam/debian-installation/steamapps/common/Factorio/ --factorioData data/factorio-1.1.76.json --json $@
 
 out/recipesAllUsage.html: out/recipesAll.json factorioRecipeDependency.py
 	./factorioRecipeDependency.py --open $< --usage $@
 
-out/recipesAllConsumption.html: out/recipesAll.json data/factories.json data/consumption.json factorioRecipeDependency.py
-	./factorioRecipeDependency.py --open $< --consumption $@ --factories data/factories.json --consumptionData data/consumption.json
+out/recipesAllConsumption.html: out/recipesAll.json data/factorio-1.1.76.json data/consumption.json factorioRecipeDependency.py
+	./factorioRecipeDependency.py --open $< --consumption $@ --factorioData data/factorio-1.1.76.json --consumptionData data/consumption.json
 
 /tmp/recipes%.json: out/recipesAll.json data/recipesGroups.json factorioRecipeDependency.py
 	./factorioRecipeDependency.py --open $< --groups data/recipesGroups.json --groupspath /tmp/
