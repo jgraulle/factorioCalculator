@@ -1,0 +1,60 @@
+{
+   "rocket-launcher": {
+      "ingredients": {
+         "iron-plate": 5,
+         "iron-gear-wheel": 5,
+         "electronic-circuit": 5
+      },
+      "time": 10,
+      "results": {
+         "rocket-launcher": 1
+      }
+   },
+   "fusion-reactor-equipment": {
+      "ingredients": {
+         "processing-unit": 200,
+         "low-density-structure": 50
+      },
+      "time": 10,
+      "results": {
+         "fusion-reactor-equipment": 1
+      }
+   },
+   "exoskeleton-equipment": {
+      "ingredients": {
+         "processing-unit": 10,
+         "electric-engine-unit": 30,
+         "steel-plate": 20
+      },
+      "time": 10,
+      "results": {
+         "exoskeleton-equipment": 1
+      }
+   },
+   "spidertron": {
+      "ingredients": {
+         "exoskeleton-equipment": 4,
+         "fusion-reactor-equipment": 2,
+         "rocket-launcher": 4,
+         "rocket-control-unit": 16,
+         "low-density-structure": 150,
+         "radar": 2,
+         "effectivity-module-3": 2,
+         "raw-fish": 1
+      },
+      "time": 10,
+      "results": {
+         "spidertron": 1
+      }
+   },
+   "spidertron-remote": {
+      "ingredients": {
+         "rocket-control-unit": 1,
+         "radar": 1
+      },
+      "time": 0.5,
+      "results": {
+         "spidertron-remote": 1
+      }
+   }
+}

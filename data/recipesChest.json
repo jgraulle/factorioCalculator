@@ -1,0 +1,66 @@
+{
+   "steel-chest": {
+      "ingredients": {
+         "steel-plate": 8
+      },
+      "time": 0.5,
+      "results": {
+         "steel-chest": 1
+      }
+   },
+   "logistic-chest-passive-provider": {
+      "ingredients": {
+         "steel-chest": 1,
+         "electronic-circuit": 3,
+         "advanced-circuit": 1
+      },
+      "time": 0.5,
+      "results": {
+         "logistic-chest-passive-provider": 1
+      }
+   },
+   "logistic-chest-active-provider": {
+      "ingredients": {
+         "steel-chest": 1,
+         "electronic-circuit": 3,
+         "advanced-circuit": 1
+      },
+      "time": 0.5,
+      "results": {
+         "logistic-chest-active-provider": 1
+      }
+   },
+   "logistic-chest-storage": {
+      "ingredients": {
+         "steel-chest": 1,
+         "electronic-circuit": 3,
+         "advanced-circuit": 1
+      },
+      "time": 0.5,
+      "results": {
+         "logistic-chest-storage": 1
+      }
+   },
+   "logistic-chest-buffer": {
+      "ingredients": {
+         "steel-chest": 1,
+         "electronic-circuit": 3,
+         "advanced-circuit": 1
+      },
+      "time": 0.5,
+      "results": {
+         "logistic-chest-buffer": 1
+      }
+   },
+   "logistic-chest-requester": {
+      "ingredients": {
+         "steel-chest": 1,
+         "electronic-circuit": 3,
+         "advanced-circuit": 1
+      },
+      "time": 0.5,
+      "results": {
+         "logistic-chest-requester": 1
+      }
+   }
+}

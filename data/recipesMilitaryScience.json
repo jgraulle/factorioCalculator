@@ -1,0 +1,145 @@
+{
+   "stone-wall": {
+      "ingredients": {
+         "stone-brick": 5
+      },
+      "time": 0.5,
+      "results": {
+         "stone-wall": 1
+      }
+   },
+   "grenade": {
+      "ingredients": {
+         "iron-plate": 5,
+         "coal": 10
+      },
+      "time": 8,
+      "results": {
+         "grenade": 1
+      }
+   },
+   "firearm-magazine": {
+      "ingredients": {
+         "iron-plate": 4
+      },
+      "time": 1,
+      "results": {
+         "firearm-magazine": 1
+      }
+   },
+   "piercing-rounds-magazine": {
+      "ingredients": {
+         "firearm-magazine": 1,
+         "steel-plate": 1,
+         "copper-plate": 5
+      },
+      "time": 3,
+      "results": {
+         "piercing-rounds-magazine": 1
+      }
+   },
+   "military-science-pack": {
+      "ingredients": {
+         "piercing-rounds-magazine": 1,
+         "grenade": 1,
+         "stone-wall": 2
+      },
+      "time": 10,
+      "results": {
+         "military-science-pack": 2
+      }
+   },
+   "gate": {
+      "ingredients": {
+         "stone-wall": 1,
+         "steel-plate": 2,
+         "electronic-circuit": 2
+      },
+      "time": 0.5,
+      "results": {
+         "gate": 1
+      }
+   },
+   "empty-barrel": {
+      "ingredients": {
+         "steel-plate": 1
+      },
+      "time": 1,
+      "results": {
+         "empty-barrel": 1
+      }
+   },
+   "cliff-explosives": {
+      "ingredients": {
+         "explosives": 10,
+         "grenade": 1,
+         "empty-barrel": 1
+      },
+      "time": 8,
+      "results": {
+         "cliff-explosives": 1
+      }
+   },
+   "cluster-grenade": {
+      "ingredients": {
+         "grenade": 7,
+         "explosives": 5,
+         "steel-plate": 5
+      },
+      "time": 8,
+      "results": {
+         "cluster-grenade": 1
+      }
+   },
+   "defender-capsule": {
+      "ingredients": {
+         "piercing-rounds-magazine": 3,
+         "electronic-circuit": 3,
+         "iron-gear-wheel": 3
+      },
+      "time": 8,
+      "results": {
+         "defender-capsule": 1
+      }
+   },
+   "distractor-capsule": {
+      "ingredients": {
+         "defender-capsule": 4,
+         "advanced-circuit": 3
+      },
+      "time": 15,
+      "results": {
+         "distractor-capsule": 1
+      }
+   },
+   "speed-module": {
+      "ingredients": {
+         "advanced-circuit": 5,
+         "electronic-circuit": 5
+      },
+      "time": 15,
+      "results": {
+         "speed-module": 1
+      }
+   },
+   "destroyer-capsule": {
+      "ingredients": {
+         "distractor-capsule": 4,
+         "speed-module": 1
+      },
+      "time": 15,
+      "results": {
+         "destroyer-capsule": 1
+      }
+   },
+   "uranium-rounds-magazine": {
+      "ingredients": {
+         "piercing-rounds-magazine": 1,
+         "uranium-238": 1
+      },
+      "time": 10,
+      "results": {
+         "uranium-rounds-magazine": 1
+      }
+   }
+}

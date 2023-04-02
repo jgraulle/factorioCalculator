@@ -1,0 +1,78 @@
+{
+   "oil-refinery": {
+      "ingredients": {
+         "steel-plate": 15,
+         "iron-gear-wheel": 10,
+         "stone-brick": 10,
+         "electronic-circuit": 10,
+         "pipe": 10
+      },
+      "time": 8,
+      "results": {
+         "oil-refinery": 1
+      }
+   },
+   "steel-furnace": {
+      "ingredients": {
+         "steel-plate": 6,
+         "stone-brick": 10
+      },
+      "time": 3,
+      "results": {
+         "steel-furnace": 1
+      }
+   },
+   "storage-tank": {
+      "ingredients": {
+         "iron-plate": 20,
+         "steel-plate": 5
+      },
+      "time": 3,
+      "results": {
+         "storage-tank": 1
+      }
+   },
+   "fluid-wagon": {
+      "ingredients": {
+         "iron-gear-wheel": 10,
+         "steel-plate": 16,
+         "pipe": 8,
+         "storage-tank": 1
+      },
+      "time": 1.5,
+      "results": {
+         "fluid-wagon": 1
+      }
+   },
+   "cargo-wagon": {
+      "ingredients": {
+         "iron-gear-wheel": 10,
+         "iron-plate": 20,
+         "steel-plate": 20
+      },
+      "time": 1,
+      "results": {
+         "cargo-wagon": 1
+      }
+   },
+   "rail-signal": {
+      "ingredients": {
+         "electronic-circuit": 1,
+         "iron-plate": 5
+      },
+      "time": 0.5,
+      "results": {
+         "rail-signal": 1
+      }
+   },
+   "rail-chain-signal": {
+      "ingredients": {
+         "electronic-circuit": 1,
+         "iron-plate": 5
+      },
+      "time": 0.5,
+      "results": {
+         "rail-chain-signal": 1
+      }
+   }
+}

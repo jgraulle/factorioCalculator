@@ -1,0 +1,84 @@
+{
+   "pumpjack": {
+      "ingredients": {
+         "steel-plate": 5,
+         "iron-gear-wheel": 10,
+         "electronic-circuit": 5,
+         "pipe": 10
+      },
+      "time": 5,
+      "results": {
+         "pumpjack": 1
+      }
+   },
+   "locomotive": {
+      "ingredients": {
+         "engine-unit": 20,
+         "electronic-circuit": 10,
+         "steel-plate": 30
+      },
+      "time": 4,
+      "results": {
+         "locomotive": 1
+      }
+   },
+  "artillery-wagon": {
+      "ingredients": {
+         "engine-unit": 64,
+         "iron-gear-wheel": 10,
+         "steel-plate": 40,
+         "pipe": 16,
+         "advanced-circuit": 20
+      },
+      "time": 4,
+      "results": {
+         "artillery-wagon": 1
+      }
+   },
+   "pump": {
+      "ingredients": {
+         "engine-unit": 1,
+         "steel-plate": 1,
+         "pipe": 1
+      },
+      "time": 2,
+      "results": {
+         "pump": 1
+      }
+   },
+   "flamethrower-turret": {
+      "ingredients": {
+         "steel-plate": 30,
+         "iron-gear-wheel": 15,
+         "pipe": 10,
+         "engine-unit": 5
+      },
+      "time": 20,
+      "results": {
+         "flamethrower-turret": 1
+      }
+   },
+   "chemical-plant": {
+      "ingredients": {
+         "steel-plate": 5,
+         "iron-gear-wheel": 5,
+         "electronic-circuit": 5,
+         "pipe": 5
+      },
+      "time": 5,
+      "results": {
+         "chemical-plant": 1
+      }
+   },
+   "roboport": {
+      "ingredients": {
+         "steel-plate": 45,
+         "iron-gear-wheel": 45,
+         "advanced-circuit": 45
+      },
+      "time": 5,
+      "results": {
+         "roboport": 1
+      }
+   }
+}

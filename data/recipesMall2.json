@@ -1,0 +1,88 @@
+{
+   "iron-stick": {
+       "ingredients": {
+          "iron-plate": 1
+       },
+       "time": 0.5,
+       "results": {
+          "iron-stick": 2
+       }
+    },
+    "train-stop": {
+       "ingredients": {
+          "electronic-circuit": 5,
+          "iron-plate": 6,
+          "iron-stick": 6,
+          "steel-plate": 3
+       },
+       "time": 0.5,
+       "results": {
+          "train-stop": 1
+       }
+    },
+    "medium-electric-pole": {
+       "ingredients": {
+          "iron-stick": 4,
+          "steel-plate": 2,
+          "copper-plate": 2
+       },
+       "time": 0.5,
+       "results": {
+          "medium-electric-pole": 1
+       }
+    },
+    "big-electric-pole": {
+       "ingredients": {
+          "iron-stick": 8,
+          "steel-plate": 5,
+          "copper-plate": 5
+       },
+       "time": 0.5,
+       "results": {
+          "big-electric-pole": 1
+       }
+    },
+    "assembling-machine-1": {
+      "ingredients": {
+         "electronic-circuit": 3,
+         "iron-gear-wheel": 5,
+         "iron-plate": 9
+      },
+      "time": 0.5,
+      "results": {
+         "assembling-machine-1": 1
+      }
+   },
+   "assembling-machine-2": {
+      "ingredients": {
+         "steel-plate": 2,
+         "electronic-circuit": 3,
+         "iron-gear-wheel": 5,
+         "assembling-machine-1": 1
+      },
+      "time": 0.5,
+      "results": {
+         "assembling-machine-2": 1
+      }
+   },
+   "speed-module": {
+      "ingredients": {
+         "advanced-circuit": 5,
+         "electronic-circuit": 5
+      },
+      "time": 15,
+      "results": {
+         "speed-module": 1
+      }
+   },
+   "assembling-machine-3": {
+      "ingredients": {
+         "speed-module": 4,
+         "assembling-machine-2": 2
+      },
+      "time": 0.5,
+      "results": {
+         "assembling-machine-3": 1
+      }
+   }
+ }

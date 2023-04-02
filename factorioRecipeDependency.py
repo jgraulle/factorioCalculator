@@ -23,7 +23,7 @@ def jsonSerializable(cls):
 @jsonSerializable
 class Recipe(NamedTuple):
     ingredients: dict[str, int]
-    energy_required: int
+    time: float
     results: dict[str, int]
 Recipes = dict[str, Recipe]
 
@@ -87,9 +87,9 @@ def getRecipes(factoriopath:string, recipesToRemove:set) -> Recipes:
                 raise ValueError("No ingredient amount found for \"{}\" at {}".format(recipeName, indexIngredient))
             ingredients[ingredientName] = ingredientAmount
         # Get optional recipe energy required
-        energyRequired = recipeLua[index]["energy_required"]
-        if energyRequired == None:
-            energyRequired = 0
+        time = recipeLua[index]["energy_required"]
+        if time == None:
+            time = 0.5
         # Get recipe result
         results = {}
         if recipeLua[index]["result"] != None:
@@ -120,7 +120,7 @@ def getRecipes(factoriopath:string, recipesToRemove:set) -> Recipes:
             results[recipeLua[index]["normal"]["result"]] = resultCount
         else:
             raise ValueError("No result found for \"{}\"".format(recipeName))
-        recipes[recipeName] = Recipe(ingredients, energyRequired, results)
+        recipes[recipeName] = Recipe(ingredients, time, results)
     # return recipes dict
     return recipes
 
@@ -130,7 +130,7 @@ def loadRecipes(jsonFilePath: string) -> Recipes:
         jsonRecipes = json.load(jsonFile)
     recipes = Recipes()
     for recipeName, jsonRecipe in jsonRecipes.items():
-        recipes[recipeName] = Recipe(jsonRecipe["ingredients"], jsonRecipe["energy_required"], jsonRecipe["results"])
+        recipes[recipeName] = Recipe(jsonRecipe["ingredients"], jsonRecipe["time"], jsonRecipe["results"])
     return recipes
 
 def recipesRemoveItem(recipes: Recipes, itemsToRemove):
@@ -289,14 +289,14 @@ def generateDot(recipes: Recipes, dotFilePath: string, itemsPngCopyFolderPath: s
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate SVG recipe dependency graph from factorio game data.')
     parser.add_argument('-f', '--factoriopath', type=str, help="Factorio path to load recipes")
-    parser.add_argument('-o', '--open', type=str, help="Load recipes from json file")
+    parser.add_argument('-o', '--open', type=argparse.FileType('r'), help="Load recipes from json file")
     parser.add_argument('-r', '--recipes', type=str, nargs='+', help="To remove recipes list by recipe name")
     parser.add_argument('-i', '--items', type=str, nargs='+', help="To remove items list by ingredients or result name")
     parser.add_argument('-l', '--leafe', action="store_true", help="To remove items at the end of the tree")
     parser.add_argument('-k', '--keep', action="store_true", help="To keep only recipe with at least one result at the end of the tree")
     parser.add_argument('-j', '--json', type=argparse.FileType('w'), help="Generate a recipe json file with the given file name")
-    parser.add_argument('-u', '--usage', type=str, help="Generate the given HTML page with for each ingredient the usage")
-    parser.add_argument('-d', '--dot', type=str, help="Generate the given graphviz dot file in the folder path")
+    parser.add_argument('-u', '--usage', type=argparse.FileType('w'), help="Generate the given HTML page with for each ingredient the usage")
+    parser.add_argument('-d', '--dot', type=argparse.FileType('w'), help="Generate the given graphviz dot file in the folder path")
     args = parser.parse_args()
 
     if args.factoriopath:
@@ -310,7 +310,7 @@ if __name__ == '__main__':
         recipes = getRecipes(args.factoriopath, recipesToRemove)
 
     if args.open:
-        recipes = loadRecipes(args.open)
+        recipes = loadRecipes(args.open.name)
 
     if args.items != None:
         recipesRemoveItem(recipes, set(args.items))
@@ -323,19 +323,19 @@ if __name__ == '__main__':
         keepOnlyLeafe(recipes)
 
     if args.json:
-        writeJsonFile(recipes, args.json)
+        writeJsonFile(recipes, args.json.name)
         print("Recipe jsonfile \"{}\" writen".format(args.json.name))
 
     if args.usage:
         usage = ingredientsByUsage(recipes)
-        itemsPngCopyFolderPath = os.path.join(os.path.dirname(args.usage), "img")
+        itemsPngCopyFolderPath = os.path.join(os.path.dirname(args.usage.name), "img")
         itemsPngCopyFolderPathes.add(itemsPngCopyFolderPath)
-        ingredientsByUsage2Html(usage, args.usage, "img")
+        ingredientsByUsage2Html(usage, args.usage.name, "img")
 
     if args.dot:
-        itemsPngCopyFolderPath = os.path.join(os.path.dirname(args.dot), "img")
+        itemsPngCopyFolderPath = os.path.join(os.path.dirname(args.dot.name), "img")
         itemsPngCopyFolderPathes.add(itemsPngCopyFolderPath)
-        generateDot(recipes, args.dot, "img")
+        generateDot(recipes, args.dot.name, "img")
 
     if args.factoriopath:
         for folderPath in itemsPngCopyFolderPathes:
