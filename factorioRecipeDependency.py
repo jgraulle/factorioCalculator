@@ -518,6 +518,8 @@ if __name__ == '__main__':
         if factorioVersion == "1.1.76":
             recipesToRemove |= {"electric-energy-interface", "loader", "fast-loader", "express-loader"}
         recipes = getRecipes(args.factoriopath, recipesToRemove)
+        if factorioVersion == "1.1.76":
+            recipes["space-science-pack"] = Recipe("space-science-pack", {"rocket-part": 100, "satellite": 1}, 1.0, {"space-science-pack": 1000}, "rocket-building")
 
     if args.open:
         recipes = loadRecipes(args.open)
