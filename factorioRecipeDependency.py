@@ -1,7 +1,5 @@
 #!/bin/python3
 # ./factorioRecipeDependency.py ~/.steam/debian-installation/steamapps/common/Factorio/ -r small-electric-pole shotgun combat-shotgun wooden-chest basic-oil-processing coal-liquefaction heavy-oil-cracking light-oil-cracking -i steel-plate electronic-circuit iron-plate iron-gear-wheel advanced-circuit processing-unit copper-plate pipe -d out && (cd out && dot -Tsvg itemDependency.dot -o itemDependency.svg)
-# todo:
-# - declare named tuple for recipe
 
 
 import argparse
@@ -12,6 +10,25 @@ import lupa
 import shutil
 from PIL import Image
 import yattag
+from typing import NamedTuple
+
+
+# Copy from https://stackoverflow.com/a/52224472/16289272
+def jsonSerializable(cls):
+    def asDict(self):
+        yield {name: value for name, value in zip(
+            self._fields,
+            iter(super(cls, self).__iter__()))}
+    cls.__iter__ = asDict
+    return cls
+
+@jsonSerializable
+class Recipe(NamedTuple):
+    ingredients: dict[str, int]
+    energy_required: int
+    results: dict[str, int]
+Recipes = dict[str, Recipe]
+
 
 def getVersion(factoriopath:string) -> string:
     # Read info.json file
@@ -22,7 +39,7 @@ def getVersion(factoriopath:string) -> string:
     return infoJson["version"]
 
 
-def getRecipes(factoriopath:string, recipesToRemove:set) -> dict:
+def getRecipes(factoriopath:string, recipesToRemove:set) -> Recipes:
     # read recipe.lua
     with open(os.path.join(factoriopath, "data", "base", "prototypes", "recipe.lua")) as recipeFile:
         recipeData = recipeFile.read()
@@ -47,7 +64,6 @@ def getRecipes(factoriopath:string, recipesToRemove:set) -> dict:
         # Check recipe type
         if recipeLua[index]["type"] != "recipe":
             raise ValueError("Invalid recipe type for \"{}\"".format(recipeName))
-        recipes[recipeName] = {}
         # Get lua recipe ingrediants
         ingredients = {}
         if recipeLua[index]["ingredients"] != None:
@@ -72,11 +88,10 @@ def getRecipes(factoriopath:string, recipesToRemove:set) -> dict:
             else:
                 raise ValueError("No ingredient amount found for \"{}\" at {}".format(recipeName, indexIngredient))
             ingredients[ingredientName] = ingredientAmount
-        recipes[recipeName]["ingredients"] = ingredients
         # Get optional recipe energy required
         energyRequired = recipeLua[index]["energy_required"]
-        if energyRequired != None:
-            recipes[recipeName]["energy_required"] = energyRequired
+        if energyRequired == None:
+            energyRequired = 0
         # Get recipe result
         results = {}
         if recipeLua[index]["result"] != None:
@@ -107,50 +122,50 @@ def getRecipes(factoriopath:string, recipesToRemove:set) -> dict:
             results[recipeLua[index]["normal"]["result"]] = resultCount
         else:
             raise ValueError("No result found for \"{}\"".format(recipeName))
-        recipes[recipeName]["results"] = results
+        recipes[recipeName] = Recipe(ingredients, energyRequired, results)
     # return recipes dict
     return recipes
 
 
-def recipesRemoveItem(recipes: dict, itemsToRemove):
+def recipesRemoveItem(recipes: Recipes, itemsToRemove):
     recipesToDelete = []
     for recipeName, recipe in recipes.items():
-        for ingredientName in list(recipe["ingredients"].keys()):
+        for ingredientName in list(recipe.ingredients.keys()):
             if ingredientName in itemsToRemove:
-                del recipe["ingredients"][ingredientName]
-        for resultName in list(recipe["results"].keys()):
+                del recipe.ingredients[ingredientName]
+        for resultName in list(recipe.results.keys()):
             if resultName in itemsToRemove:
-                del recipe["results"][resultName]
-        if len(recipe["ingredients"])==0 or len(recipe["results"])==0:
+                del recipe.results[resultName]
+        if len(recipe.ingredients)==0 or len(recipe.results)==0:
             recipesToDelete.append(recipeName)
     for recipeName in recipesToDelete:
         del recipes[recipeName]
 
 def writeJsonFile(data:dict, fileName:string):
     with open(fileName.name, 'w') as jsonFile:
-        json.dump(data, jsonFile, ensure_ascii=False, indent=3)
+        json.dump(data, jsonFile, ensure_ascii=False, indent=3, )
 
 
-def ingredientsByUsage(recipes:dict) -> dict:
+def ingredientsByUsage(recipes: Recipes) -> dict:
     usage = {}
     for recipe in recipes.values():
-        for ingredientName in recipe["ingredients"].keys():
+        for ingredientName in recipe.ingredients.keys():
             if ingredientName not in usage:
                 usage[ingredientName] = []
-            for result in recipe["results"].keys():
+            for result in recipe.results.keys():
                 usage[ingredientName].append(result)
     return dict(sorted(usage.items(), key=lambda item: len(item[1]), reverse=True))
 
 
-def removeLeafe(recipes:dict):
+def removeLeafe(recipes: Recipes):
     itemUsedAsIngredient = set()
     for recipe in recipes.values():
-        for ingredientName in recipe["ingredients"].keys():
+        for ingredientName in recipe.ingredients.keys():
             itemUsedAsIngredient.add(ingredientName)
     for recipe in recipes.values():
-        for resultName in list(recipe["results"].keys()):
+        for resultName in list(recipe.results.keys()):
             if resultName not in itemUsedAsIngredient:
-                del recipe["results"][resultName]
+                del recipe.results[resultName]
 
 
 def itemPngPath(itemName: string, factoriopath: string) -> string:
@@ -178,20 +193,20 @@ def itemPngCopy(itemName: string, factoriopath:string, dstFolderPath: string):
     imgdst.save(os.path.join(dstFolderPath, itemName+".png"))
 
 
-def itemsPngCopy(recipes: dict, factoriopath:string, dstFolderPath: string):
+def itemsPngCopy(recipes: Recipes, factoriopath:string, dstFolderPath: string):
     itemsName = set()
     for recipe in recipes.values():
-        for ingredientName in recipe["ingredients"].keys():
+        for ingredientName in recipe.ingredients.keys():
             if ingredientName not in itemsName:
                 itemPngCopy(ingredientName, factoriopath, dstFolderPath)
                 itemsName.add(ingredientName)
-        for resultName in recipe["results"].keys():
+        for resultName in recipe.results.keys():
             if resultName not in itemsName:
                 itemPngCopy(resultName, factoriopath, dstFolderPath)
                 itemsName.add(resultName)
 
 
-def ingredientsByUsage2Html(ingredientsByUsage:dict, htmlFilePath: string, itemsPngCopyFolderPath: string):
+def ingredientsByUsage2Html(ingredientsByUsage: dict, htmlFilePath: string, itemsPngCopyFolderPath: string):
     doc, tag, text = yattag.Doc().tagtext()
     with tag('html'):
         with tag("head"):
@@ -221,7 +236,7 @@ def ingredientsByUsage2Html(ingredientsByUsage:dict, htmlFilePath: string, items
         htmlFile.write(bytes(html, "utf8"))
 
 
-def generateDot(ingredientsByUsage:dict, dotFilePath: string, itemsPngCopyFolderPath: string):
+def generateDot(recipes: Recipes, dotFilePath: string, itemsPngCopyFolderPath: string):
     def convertItemName(name:str):
         return name.replace("-", "_").replace(" ", "_ ")
     def generateNode(ingredientName:str) -> str:
@@ -231,11 +246,11 @@ def generateDot(ingredientsByUsage:dict, dotFilePath: string, itemsPngCopyFolder
         itemsName = set()
         # Write Node
         for recipe in recipes.values():
-            for ingredientName in recipe["ingredients"].keys():
+            for ingredientName in recipe.ingredients.keys():
                 if ingredientName not in itemsName:
                     dotFile.write(generateNode(ingredientName))
                     itemsName.add(ingredientName)
-            for resultName in recipe["results"].keys():
+            for resultName in recipe.results.keys():
                 if resultName not in itemsName:
                     dotFile.write(generateNode(resultName))
                     itemsName.add(resultName)
@@ -243,8 +258,8 @@ def generateDot(ingredientsByUsage:dict, dotFilePath: string, itemsPngCopyFolder
         # Write edge 
         for recipe in recipes.values():
             ingredients = "{"
-            for resultName in recipe["results"].keys():
-                ingredients = ', '.join(convertItemName(ingredientName) for ingredientName in recipe["ingredients"].keys())
+            for resultName in recipe.results.keys():
+                ingredients = ', '.join(convertItemName(ingredientName) for ingredientName in recipe.ingredients.keys())
                 dotFile.write("   {{{}}} -> {}\n".format(ingredients, convertItemName(resultName)))
         dotFile.write("}\n")
 
