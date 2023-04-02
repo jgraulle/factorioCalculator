@@ -228,13 +228,17 @@ def ingredientsByUsage2Html(ingredientsByUsage: dict, htmlFilePath: string, item
             with tag('table'):
                 with tag('tr'):
                     with tag('th'):
-                        text("ingredient")
+                        text("name")
+                    with tag('th'):
+                        text("icon")
                     with tag('th'):
                         text("count")
                     with tag('th'):
                         text("used by")
                 for ingredientName, resultList in ingredientsByUsage.items():
                     with tag('tr'):
+                        with tag('td'):
+                            text(ingredientName)
                         with tag('td'):
                             doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, ingredientName+".png"), alt=ingredientName, title=ingredientName)
                         with tag('td'):
