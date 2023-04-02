@@ -170,6 +170,16 @@ def removeLeafe(recipes: Recipes):
             del recipes[recipeName]
 
 
+def keepOnlyLeafe(recipes: Recipes):
+    itemUsedAsIngredient = set()
+    for recipe in recipes.values():
+        for ingredientName in recipe.ingredients.keys():
+            itemUsedAsIngredient.add(ingredientName)
+    for recipeName in list(recipes.keys()):
+        if len(set(recipes[recipeName].results.keys()).difference(itemUsedAsIngredient))==0:
+            del recipes[recipeName]
+
+
 def itemPngPath(itemName: string, factoriopath: string) -> string:
     itemRenames = {"discharge-defense-remote": "discharge-defense-equipment-controller",
                    "stone-wall": "wall",
@@ -272,6 +282,7 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--recipes', type=str, nargs='+', help="To remove recipes list by recipe name")
     parser.add_argument('-i', '--items', type=str, nargs='+', help="To remove items list by ingredients or result name")
     parser.add_argument('-l', '--leafe', action="store_true", help="To remove items at the end of the tree")
+    parser.add_argument('-k', '--keep', action="store_true", help="To keep only recipe with at least one result at the end of the tree")
     parser.add_argument('-j', '--json', type=argparse.FileType('w'), help="Generate a recipe json file with the given file name")
     parser.add_argument('-u', '--usage', type=str, help="Generate the given HTML page with for each ingredient the usage")
     parser.add_argument('-d', '--dot', type=str, help="Generate the given graphviz dot file in the folder path")
@@ -293,6 +304,9 @@ if __name__ == '__main__':
 
     if args.leafe:
         removeLeafe(recipes)
+
+    if args.keep:
+        keepOnlyLeafe(recipes)
 
     if args.json:
         writeJsonFile(recipes, args.json)
