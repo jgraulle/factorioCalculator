@@ -1,6 +1,4 @@
 #!/bin/python3
-# ./factorioRecipeDependency.py ~/.steam/debian-installation/steamapps/common/Factorio/ -r small-electric-pole shotgun combat-shotgun wooden-chest basic-oil-processing coal-liquefaction heavy-oil-cracking light-oil-cracking -i steel-plate electronic-circuit iron-plate iron-gear-wheel advanced-circuit processing-unit copper-plate pipe -d out && (cd out && dot -Tsvg itemDependency.dot -o itemDependency.svg)
-
 
 import argparse
 import string
@@ -126,6 +124,14 @@ def getRecipes(factoriopath:string, recipesToRemove:set) -> Recipes:
     # return recipes dict
     return recipes
 
+
+def loadRecipes(jsonFilePath: string) -> Recipes:
+    with open(jsonFilePath, 'r') as jsonFile:
+        jsonRecipes = json.load(jsonFile)
+    recipes = Recipes()
+    for recipeName, jsonRecipe in jsonRecipes.items():
+        recipes[recipeName] = Recipe(jsonRecipe["ingredients"], jsonRecipe["energy_required"], jsonRecipe["results"])
+    return recipes
 
 def recipesRemoveItem(recipes: Recipes, itemsToRemove):
     recipesToDelete = []
@@ -282,7 +288,8 @@ def generateDot(recipes: Recipes, dotFilePath: string, itemsPngCopyFolderPath: s
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate SVG recipe dependency graph from factorio game data.')
-    parser.add_argument('factoriopath')
+    parser.add_argument('-f', '--factoriopath', type=str, help="Factorio path to load recipes")
+    parser.add_argument('-o', '--open', type=str, help="Load recipes from json file")
     parser.add_argument('-r', '--recipes', type=str, nargs='+', help="To remove recipes list by recipe name")
     parser.add_argument('-i', '--items', type=str, nargs='+', help="To remove items list by ingredients or result name")
     parser.add_argument('-l', '--leafe', action="store_true", help="To remove items at the end of the tree")
@@ -292,16 +299,19 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--dot', type=str, help="Generate the given graphviz dot file in the folder path")
     args = parser.parse_args()
 
-    factorioVersion = getVersion(args.factoriopath)
-    print("Factorio version:", factorioVersion)
+    if args.factoriopath:
+        factorioVersion = getVersion(args.factoriopath)
+        print("Factorio version:", factorioVersion)
+        recipesToRemove = set()
+        if args.recipes != None:
+            recipesToRemove |= set(args.recipes)
+        if factorioVersion == "1.1.76":
+            recipesToRemove |= {"electric-energy-interface", "loader", "fast-loader", "express-loader"}
+        recipes = getRecipes(args.factoriopath, recipesToRemove)
 
-    recipesToRemove = set()
-    if args.recipes != None:
-        recipesToRemove |= set(args.recipes)
-    if factorioVersion == "1.1.76":
-        recipesToRemove |= {"electric-energy-interface", "loader", "fast-loader", "express-loader"}
+    if args.open:
+        recipes = loadRecipes(args.open)
 
-    recipes = getRecipes(args.factoriopath, recipesToRemove)
     if args.items != None:
         recipesRemoveItem(recipes, set(args.items))
     itemsPngCopyFolderPathes = set()
@@ -327,7 +337,8 @@ if __name__ == '__main__':
         itemsPngCopyFolderPathes.add(itemsPngCopyFolderPath)
         generateDot(recipes, args.dot, "img")
 
-    for folderPath in itemsPngCopyFolderPathes:
-        if not os.path.exists(folderPath):
-            os.makedirs(folderPath)
-        itemsPngCopy(recipes, args.factoriopath, folderPath)
+    if args.factoriopath:
+        for folderPath in itemsPngCopyFolderPathes:
+            if not os.path.exists(folderPath):
+                os.makedirs(folderPath)
+            itemsPngCopy(recipes, args.factoriopath, folderPath)
