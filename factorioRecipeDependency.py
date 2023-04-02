@@ -16,6 +16,7 @@ class Recipe(NamedTuple):
     ingredients: dict[str, int]
     time: float
     results: dict[str, int]
+    category: str
 Recipes = dict[str, Recipe]
 
 
@@ -53,6 +54,10 @@ def getRecipes(factoriopath:string, recipesToRemove:set) -> Recipes:
         # Check recipe type
         if recipeLua[index]["type"] != "recipe":
             raise ValueError("Invalid recipe type for \"{}\"".format(recipeName))
+        # Get category
+        recipeCategory = "basic-crafting"
+        if recipeLua[index]["category"] != None:
+            recipeCategory = recipeLua[index]["category"]
         # Get lua recipe ingrediants
         ingredients = {}
         if recipeLua[index]["ingredients"] != None:
@@ -111,7 +116,7 @@ def getRecipes(factoriopath:string, recipesToRemove:set) -> Recipes:
             results[recipeLua[index]["normal"]["result"]] = resultCount
         else:
             raise ValueError("No result found for \"{}\"".format(recipeName))
-        recipes[recipeName] = Recipe(ingredients, time, results)
+        recipes[recipeName] = Recipe(ingredients, time, results, recipeCategory)
     # return recipes dict
     return recipes
 
@@ -121,7 +126,7 @@ def loadRecipes(jsonFilePath: string) -> Recipes:
         jsonRecipes = json.load(jsonFile)
     recipes = Recipes()
     for recipeName, jsonRecipe in jsonRecipes.items():
-        recipes[recipeName] = Recipe(jsonRecipe["ingredients"], jsonRecipe["time"], jsonRecipe["results"])
+        recipes[recipeName] = Recipe(jsonRecipe["ingredients"], jsonRecipe["time"], jsonRecipe["results"], jsonRecipe["category"])
     return recipes
 
 
@@ -143,7 +148,7 @@ def recipesRemoveItem(recipes: Recipes, itemsToRemove):
 def writeRecipesJsonFile(recipes: Recipes, fileName: string):
     jsonData = {}
     for recipeName, recipe in recipes.items():
-        jsonData[recipeName] = {"ingredients": recipe.ingredients, "time": recipe.time, "results": recipe.results}
+        jsonData[recipeName] = {"ingredients": recipe.ingredients, "time": recipe.time, "results": recipe.results, "category": recipe.category}
     with open(fileName, 'w') as jsonFile:
         json.dump(jsonData, jsonFile, ensure_ascii=False, indent=3)
 
