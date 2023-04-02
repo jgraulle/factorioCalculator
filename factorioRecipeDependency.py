@@ -509,6 +509,8 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--groupspath', type=pathlib.Path, help="folder path to generate recipe file from group")
     args = parser.parse_args()
 
+    itemsPngCopyFolderPathes = set()
+
     if args.factoriopath:
         factorioVersion = getVersion(args.factoriopath)
         print("Factorio version:", factorioVersion)
@@ -526,7 +528,6 @@ if __name__ == '__main__':
 
     if args.items != None:
         recipesRemoveItem(recipes, set(args.items))
-    itemsPngCopyFolderPathes = set()
 
     if args.leafe:
         removeLeafe(recipes)
@@ -537,6 +538,9 @@ if __name__ == '__main__':
     if args.json:
         writeRecipesJsonFile(recipes, args.json)
         print("Recipe jsonfile \"{}\" writen".format(args.json))
+        if args.factoriopath:
+            itemsPngCopyFolderPath = os.path.join(os.path.dirname(args.json), "img")
+            itemsPngCopyFolderPathes.add(itemsPngCopyFolderPath)
 
     if args.usage:
         usage = ingredientsByUsage(recipes)
