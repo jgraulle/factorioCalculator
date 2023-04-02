@@ -464,7 +464,7 @@ def consumption2Html(consumptionRate:dict, noRecipes:dict, overproduction: dict,
     with tag('html'):
         with tag("head"):
             with tag("style"):
-                text("table, th, td {border: 1px solid black;border-collapse: collapse;}")
+                text("table, th, td {border: 1px solid black;border-collapse: collapse; text-align: right}")
         with tag('body'):
             if prev != None:
                 with tag('a', href=prev):
@@ -472,19 +472,19 @@ def consumption2Html(consumptionRate:dict, noRecipes:dict, overproduction: dict,
             if next != None:
                 with tag('a', href=next):
                     text("Next")
-            with tag('table'):
+            with tag('table', id="mainTable"):
                 with tag('tr'):
-                    with tag('th'):
+                    with tag('th', onclick="sortTable(0)"):
                         text("result")
-                    with tag('th'):
+                    with tag('th', onclick="sortTable(1)"):
                         text("factory count")
-                    with tag('th'):
+                    with tag('th', onclick="sortTable(2)"):
                         text("ingredients")
-                    with tag('th'):
+                    with tag('th', onclick="sortTable(3)"):
                         text("electricity")
                 for production in consumptionRate.values():
                     with tag('tr'):
-                        with tag('td', align="right"):
+                        with tag('td', ("data-sort", str(max(production["results"].values())))):
                             isFirst = True
                             for resultName, resultRate in production["results"].items():
                                 if not isFirst:
@@ -492,10 +492,10 @@ def consumption2Html(consumptionRate:dict, noRecipes:dict, overproduction: dict,
                                 text("{:.3f}".format(resultRate))
                                 isFirst = False
                                 doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, resultName+".png"), alt=resultName, title=resultName)
-                        with tag('td', align="right"):
+                        with tag('td', ("data-sort", str(production["factories-count"]))):
                             text("{:.1f}".format(production["factories-count"]))
                             doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, production["factories-name"]+".png"), alt=production["factories-name"], title=production["factories-name"])
-                        with tag('td', align="right"):
+                        with tag('td', ("data-sort", str(max(production["ingredients"].values())))):
                             isFirst = True
                             for ingredientName, ingredientRate in production["ingredients"].items():
                                 if not isFirst:
@@ -503,7 +503,7 @@ def consumption2Html(consumptionRate:dict, noRecipes:dict, overproduction: dict,
                                 text("{:.3f}".format(ingredientRate))
                                 isFirst = False
                                 doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, ingredientName+".png"), alt=ingredientName, title=ingredientName)
-                        with tag('td', align="right"):
+                        with tag('td', ("data-sort", str(production["electric-consumption"]))):
                             electric, suffix = toSiSuffix(production["electric-consumption"])
                             text("{:.1f}{}W".format(electric, suffix))
                             electricTotal += production["electric-consumption"]
@@ -511,7 +511,7 @@ def consumption2Html(consumptionRate:dict, noRecipes:dict, overproduction: dict,
                     doc.stag('td')
                     doc.stag('td')
                     doc.stag('td')
-                    with tag('td', align="right"):
+                    with tag('td'):
                         electric, suffix = toSiSuffix(electricTotal)
                         text("{:.1f}{}W".format(electric, suffix))
             doc.stag('br')
@@ -521,15 +521,19 @@ def consumption2Html(consumptionRate:dict, noRecipes:dict, overproduction: dict,
                         text("base")
                 for ingredientName, ingredientRate in noRecipes.items():
                     with tag('tr'):
-                        with tag('td', align="right"):
+                        with tag('td'):
                             text("{:.3f}".format(ingredientRate))
                             doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, ingredientName+".png"), alt=ingredientName, title=ingredientName)
                 for ingredientName, ingredientRate in overproduction.items():
                     with tag('tr'):
-                        with tag('td', align="right"):
+                        with tag('td'):
                             text("{:.3f}".format(ingredientRate))
                             doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, ingredientName+".png"), alt=ingredientName, title=ingredientName)
-    html = doc.getvalue()
+            with tag('script'):
+                with open("data/script.js", 'r') as javaScriptFile:
+                    doc.asis("\n")
+                    doc.asis(javaScriptFile.read())
+    html = yattag.indent(doc.getvalue())
     with open(htmlFilePath, "wb") as htmlFile:
         htmlFile.write(bytes(html, "utf8"))
 
