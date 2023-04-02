@@ -1,4 +1,15 @@
 {
+   "burner-mining-drill": {
+      "ingredients": {
+         "iron-gear-wheel": 3,
+         "stone-furnace": 1,
+         "iron-plate": 3
+      },
+      "time": 0.5,
+      "results": {
+         "burner-mining-drill": 1
+      }
+   },
    "small-electric-pole": {
       "ingredients": {
          "wood": 1,

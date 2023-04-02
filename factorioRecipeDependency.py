@@ -9,18 +9,9 @@ import shutil
 from PIL import Image
 import yattag
 from typing import NamedTuple
+import math
 
 
-# Copy from https://stackoverflow.com/a/52224472/16289272
-def jsonSerializable(cls):
-    def asDict(self):
-        yield {name: value for name, value in zip(
-            self._fields,
-            iter(super(cls, self).__iter__()))}
-    cls.__iter__ = asDict
-    return cls
-
-@jsonSerializable
 class Recipe(NamedTuple):
     ingredients: dict[str, int]
     time: float
@@ -133,6 +124,7 @@ def loadRecipes(jsonFilePath: string) -> Recipes:
         recipes[recipeName] = Recipe(jsonRecipe["ingredients"], jsonRecipe["time"], jsonRecipe["results"])
     return recipes
 
+
 def recipesRemoveItem(recipes: Recipes, itemsToRemove):
     recipesToDelete = []
     for recipeName, recipe in recipes.items():
@@ -147,9 +139,13 @@ def recipesRemoveItem(recipes: Recipes, itemsToRemove):
     for recipeName in recipesToDelete:
         del recipes[recipeName]
 
-def writeJsonFile(data:dict, fileName:string):
-    with open(fileName.name, 'w') as jsonFile:
-        json.dump(data, jsonFile, ensure_ascii=False, indent=3)
+
+def writeRecipesJsonFile(recipes: Recipes, fileName: string):
+    jsonData = {}
+    for recipeName, recipe in recipes.items():
+        jsonData[recipeName] = {"ingredients": recipe.ingredients, "time": recipe.time, "results": recipe.results}
+    with open(fileName, 'w') as jsonFile:
+        json.dump(jsonData, jsonFile, ensure_ascii=False, indent=3)
 
 
 def ingredientsByUsage(recipes: Recipes) -> dict:
@@ -286,6 +282,83 @@ def generateDot(recipes: Recipes, dotFilePath: string, itemsPngCopyFolderPath: s
         dotFile.write("}\n")
 
 
+def generateConso(recipes: Recipes, requesteds: dict, htmlFilePath: string, itemsPngCopyFolderPath: string) -> tuple[dict,dict]:
+    conso = {}
+    isNewRequested = True
+    counter = 0
+    while isNewRequested:
+        isNewRequested = False
+        counter += 1
+        for recipeName, recipe in recipes.items():
+            factoryCount = 0
+            for resultName, resultCount in recipe.results.items():
+                if resultName in requesteds:
+                    factoryUnitProduction = 1.0/recipe.time*resultCount
+                    factoryCount = max(requesteds[resultName] / factoryUnitProduction, factoryCount)
+            if factoryCount > 0:
+                if recipeName not in conso:
+                    conso[recipeName] = {"factoryCount": math.ceil(factoryCount), "results": {}, "ingredients": {}}
+                for resultName, resultCount in recipe.results.items():
+                    if resultName not in conso[recipeName]["results"]:
+                        conso[recipeName]["results"][resultName] = 0.0
+                    conso[recipeName]["results"][resultName] += 1.0 / recipe.time * resultCount * factoryCount
+                    if resultName in requesteds:
+                        del requesteds[resultName]
+                for ingredientName, ingredientCount in recipe.ingredients.items():
+                    ingredientConso = 1.0 / recipe.time * ingredientCount * factoryCount
+                    if conso[recipeName]["results"][resultName] not in conso[recipeName]["ingredients"]:
+                        conso[recipeName]["ingredients"][ingredientName] = 0.0
+                    conso[recipeName]["ingredients"][ingredientName] += ingredientConso
+                    if ingredientName not in requesteds:
+                        requesteds[ingredientName] = 0.0
+                    requesteds[ingredientName] += 1.0 / recipe.time * ingredientCount * factoryCount
+                    isNewRequested = True
+    return conso,requesteds
+
+
+def conso2Html(conso:dict, requesteds:dict, htmlFilePath: string, itemsPngCopyFolderPath: string):
+    doc, tag, text = yattag.Doc().tagtext()
+    with tag('html'):
+        with tag("head"):
+            with tag("style"):
+                text("table, th, td {border: 1px solid black;border-collapse: collapse;}")
+        with tag('body'):
+            with tag('table'):
+                with tag('tr'):
+                    with tag('th'):
+                        text("factory count")
+                    with tag('th'):
+                        text("result")
+                    with tag('th'):
+                        text("ingredients")
+                for production in conso.values():
+                    with tag('tr'):
+                        with tag('td'):
+                            text(production["factoryCount"])
+                        with tag('td'):
+                            for resultName, resultRate in production["results"].items():
+                                text(" + {:.2f}".format(resultRate))
+                                doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, resultName+".png"), alt=resultName, title=resultName)
+                        with tag('td'):
+                            for ingredientName, ingredientRate in production["ingredients"].items():
+                                text(" + {:.2f}".format(ingredientRate))
+                                doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, ingredientName+".png"), alt=ingredientName, title=ingredientName)
+            doc.stag('br')
+            with tag('table'):
+                with tag('tr'):
+                    with tag('th'):
+                        text("base")
+                for ingredientName, ingredientRate in requesteds.items():
+                    with tag('tr'):
+                        with tag('td'):
+                            text("{:.2f}".format(ingredientRate))
+                            doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, ingredientName+".png"), alt=ingredientName, title=ingredientName)
+
+    html = doc.getvalue()
+    with open(htmlFilePath, "wb") as htmlFile:
+        htmlFile.write(bytes(html, "utf8"))
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate SVG recipe dependency graph from factorio game data.')
     parser.add_argument('-f', '--factoriopath', type=str, help="Factorio path to load recipes")
@@ -297,6 +370,7 @@ if __name__ == '__main__':
     parser.add_argument('-j', '--json', type=argparse.FileType('w'), help="Generate a recipe json file with the given file name")
     parser.add_argument('-u', '--usage', type=argparse.FileType('w'), help="Generate the given HTML page with for each ingredient the usage")
     parser.add_argument('-d', '--dot', type=argparse.FileType('w'), help="Generate the given graphviz dot file in the folder path")
+    parser.add_argument('-c', '--conso', type=argparse.FileType('w'), help="Generate the given HTML page with for each recipes the consume quantity")
     args = parser.parse_args()
 
     if args.factoriopath:
@@ -323,7 +397,7 @@ if __name__ == '__main__':
         keepOnlyLeafe(recipes)
 
     if args.json:
-        writeJsonFile(recipes, args.json.name)
+        writeRecipesJsonFile(recipes, args.json.name)
         print("Recipe jsonfile \"{}\" writen".format(args.json.name))
 
     if args.usage:
@@ -336,6 +410,12 @@ if __name__ == '__main__':
         itemsPngCopyFolderPath = os.path.join(os.path.dirname(args.dot.name), "img")
         itemsPngCopyFolderPathes.add(itemsPngCopyFolderPath)
         generateDot(recipes, args.dot.name, "img")
+
+    if args.conso:
+        itemsPngCopyFolderPath = os.path.join(os.path.dirname(args.conso.name), "img")
+        itemsPngCopyFolderPathes.add(itemsPngCopyFolderPath)
+        conso,requesteds = generateConso(recipes, {"production-science-pack": 0.5}, args.conso.name, "img")
+        conso2Html(conso, requesteds, args.conso.name, "img")
 
     if args.factoriopath:
         for folderPath in itemsPngCopyFolderPathes:
