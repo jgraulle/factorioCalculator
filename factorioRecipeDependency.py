@@ -10,22 +10,27 @@ from PIL import Image
 import yattag
 from typing import NamedTuple
 import math
+import pathlib
 
 
 class Recipe(NamedTuple):
+    name: str
     ingredients: dict[str, int]
     time: float
     results: dict[str, int]
     category: str
-Recipes = dict[str, Recipe]
+RecipesByName = dict[str, Recipe]
+RecipesByResult = dict[str, list[tuple[float,Recipe]]]
 
 
 class CraftingFactory(NamedTuple):
+    name: str
     consumptionType: str
     consumptionQuantity: int
     speed: float
     categories: str
-CraftingFactories = dict[str, CraftingFactory]
+CraftingFactoriesByName = dict[str, CraftingFactory]
+CraftingFactoriesByCategories = dict[str, CraftingFactory]
 
 
 def getVersion(factoriopath:string) -> string:
@@ -37,7 +42,7 @@ def getVersion(factoriopath:string) -> string:
     return infoJson["version"]
 
 
-def getRecipes(factoriopath:string, recipesToRemove:set) -> Recipes:
+def getRecipes(factoriopath:string, recipesToRemove:set) -> RecipesByName:
     # read recipe.lua
     with open(os.path.join(factoriopath, "data", "base", "prototypes", "recipe.lua")) as recipeFile:
         recipeData = recipeFile.read()
@@ -126,21 +131,47 @@ def getRecipes(factoriopath:string, recipesToRemove:set) -> Recipes:
             results[recipeLua[index]["normal"]["result"]] = resultCount
         else:
             raise ValueError("No result found for \"{}\"".format(recipeName))
-        recipes[recipeName] = Recipe(ingredients, time, results, recipeCategory)
+        recipes[recipeName] = Recipe(recipeName, ingredients, time, results, recipeCategory)
     # return recipes dict
     return recipes
 
 
-def loadRecipes(jsonFilePath: string) -> Recipes:
+def loadRecipes(jsonFilePath: string) -> RecipesByName:
     with open(jsonFilePath, 'r') as jsonFile:
         jsonRecipes = json.load(jsonFile)
-    recipes = Recipes()
+    recipes = RecipesByName()
     for recipeName, jsonRecipe in jsonRecipes.items():
-        recipes[recipeName] = Recipe(jsonRecipe["ingredients"], jsonRecipe["time"], jsonRecipe["results"], jsonRecipe["category"])
+        recipes[recipeName] = Recipe(recipeName, jsonRecipe["ingredients"], jsonRecipe["time"], jsonRecipe["results"], jsonRecipe["category"])
     return recipes
 
 
-def recipesRemoveItem(recipes: Recipes, itemsToRemove):
+def recipesByName2recipesByResult(recipesByName: RecipesByName, recipesPreferences: dict) -> RecipesByResult:
+    recipesByResult = RecipesByResult()
+    for recipe in recipesByName.values():
+        for resultName in recipe.results.keys():
+            ratio = 1.0
+            if resultName in recipesPreferences:
+                if recipe.name in recipesPreferences[resultName]:
+                    ratio = recipesPreferences[resultName][recipe.name]
+                else:
+                    ratio = 0.0
+            elif resultName in recipesByResult:
+                raise ValueError("There are more than one recipe to produce {} you have to set your preferencies in consumption data file".format(resultName))
+            if ratio == 0.0:
+                continue
+            if resultName not in recipesByResult:
+                recipesByResult[resultName] = []
+            recipesByResult[resultName].append((ratio, recipe))
+    for resultName, recipes in recipesByResult.items():
+        ratioTotal = 0.0
+        for ratio, _ in recipes:
+            ratioTotal += ratio
+        if ratioTotal != 1.0:
+            raise ValueError("The ratio sum to produce {} is {} and it must be 1.0".format(resultName, ratioTotal))
+    return recipesByResult
+
+
+def recipesRemoveItem(recipes: RecipesByName, itemsToRemove):
     recipesToDelete = []
     for recipeName, recipe in recipes.items():
         for ingredientName in list(recipe.ingredients.keys()):
@@ -155,7 +186,7 @@ def recipesRemoveItem(recipes: Recipes, itemsToRemove):
         del recipes[recipeName]
 
 
-def writeRecipesJsonFile(recipes: Recipes, filePath: string):
+def writeRecipesJsonFile(recipes: RecipesByName, filePath: string):
     jsonData = {}
     for recipeName, recipe in recipes.items():
         jsonData[recipeName] = {"ingredients": recipe.ingredients, "time": recipe.time, "results": recipe.results, "category": recipe.category}
@@ -163,7 +194,7 @@ def writeRecipesJsonFile(recipes: Recipes, filePath: string):
         json.dump(jsonData, jsonFile, ensure_ascii=False, indent=3)
 
 
-def ingredientsByUsage(recipes: Recipes) -> dict:
+def ingredientsByUsage(recipes: RecipesByName) -> dict:
     usage = {}
     for recipe in recipes.values():
         for ingredientName in recipe.ingredients.keys():
@@ -174,7 +205,7 @@ def ingredientsByUsage(recipes: Recipes) -> dict:
     return dict(sorted(usage.items(), key=lambda item: len(item[1]), reverse=True))
 
 
-def removeLeafe(recipes: Recipes):
+def removeLeafe(recipes: RecipesByName):
     itemUsedAsIngredient = set()
     for recipe in recipes.values():
         for ingredientName in recipe.ingredients.keys():
@@ -187,7 +218,7 @@ def removeLeafe(recipes: Recipes):
             del recipes[recipeName]
 
 
-def keepOnlyLeafe(recipes: Recipes):
+def keepOnlyLeafe(recipes: RecipesByName):
     itemUsedAsIngredient = set()
     for recipe in recipes.values():
         for ingredientName in recipe.ingredients.keys():
@@ -222,7 +253,7 @@ def itemPngCopy(itemName: string, factoriopath:string, dstFolderPath: string):
     imgdst.save(os.path.join(dstFolderPath, itemName+".png"))
 
 
-def itemsPngCopy(recipes: Recipes, factoriopath:string, dstFolderPath: string):
+def itemsPngCopy(recipes: RecipesByName, factoriopath:string, dstFolderPath: string):
     itemsName = set()
     for recipe in recipes.values():
         for ingredientName in recipe.ingredients.keys():
@@ -269,7 +300,7 @@ def ingredientsByUsage2Html(ingredientsByUsage: dict, htmlFilePath: string, item
         htmlFile.write(bytes(html, "utf8"))
 
 
-def generateDot(recipes: Recipes, dotFilePath: string, itemsPngCopyFolderPath: string):
+def generateDot(recipes: RecipesByName, dotFilePath: string, itemsPngCopyFolderPath: string):
     def convertItemName(name:str):
         return name.replace("-", "_").replace(" ", "_ ")
     def generateNode(ingredientName:str) -> str:
@@ -297,66 +328,79 @@ def generateDot(recipes: Recipes, dotFilePath: string, itemsPngCopyFolderPath: s
         dotFile.write("}\n")
 
 
-def loadFactories(factoriesJsonFilePath: string) -> CraftingFactories:
+def loadFactories(factoriesJsonFilePath: string) -> CraftingFactoriesByName:
     with open(factoriesJsonFilePath, 'r') as jsonFile:
         jsonFactories = json.load(jsonFile)
     craftingFactories = {}
     for factoryName, jsonFactory in jsonFactories.items():
         if "crafting" in jsonFactory:
-            craftingFactories[factoryName] = CraftingFactory(jsonFactory["consumption"]["type"],
+            craftingFactories[factoryName] = CraftingFactory(factoryName,
+                                                             jsonFactory["consumption"]["type"],
                                                              jsonFactory["consumption"]["quantity"],
                                                              jsonFactory["crafting"]["speed"],
                                                              jsonFactory["crafting"]["categories"])
     return craftingFactories
 
 
-def generateConso(recipes: Recipes, requesteds: dict) -> tuple[dict,dict]:
-    conso = {}
-    isNewRequested = True
-    while isNewRequested:
-        isNewRequested = False
-        for recipeName, recipe in recipes.items():
-            productionCount = 0.0
-            for resultName, resultCount in recipe.results.items():
-                if resultName in requesteds and requesteds[resultName]>0.0:
-                    quantityPerProduction = 1.0/recipe.time*resultCount
-                    productionCount = max(requesteds[resultName] / quantityPerProduction, productionCount)
-            if productionCount > 0.0:
-                if recipeName not in conso:
-                    conso[recipeName] = {"productionCount": 0.0, "category": recipe.category, "results": {}, "ingredients": {}}
-                conso[recipeName]["productionCount"] += productionCount
-                if recipeName == "":
-                    print("{:.2f} += {:.2f} => {:.2f}".format(recipeName, productionCount, conso[recipeName]["productionCount"]))
-                for resultName, resultCount in recipe.results.items():
-                    resultProduction = 1.0 / recipe.time * resultCount * productionCount
-                    if resultName not in conso[recipeName]["results"]:
-                        conso[recipeName]["results"][resultName] = 0.0
-                    conso[recipeName]["results"][resultName] += resultProduction
-                    if resultName not in requesteds:
-                        requesteds[resultName] = 0.0
-                    requesteds[resultName] -= resultProduction
-                    if requesteds[resultName] == 0.0:
-                        del requesteds[resultName]
-                for ingredientName, ingredientCount in recipe.ingredients.items():
-                    ingredientConsumption = 1.0 / recipe.time * ingredientCount * productionCount
-                    if ingredientName not in conso[recipeName]["ingredients"]:
-                        conso[recipeName]["ingredients"][ingredientName] = 0.0
-                    conso[recipeName]["ingredients"][ingredientName] += ingredientConsumption
-                    if ingredientName not in requesteds:
-                        requesteds[ingredientName] = 0.0
-                    requesteds[ingredientName] += ingredientConsumption
-                isNewRequested = True
-    return conso,requesteds
+def loadConsumptionData(consumptionDataJsonFilePath) -> tuple[dict, dict, dict[str, str]]:
+    with open(consumptionDataJsonFilePath, 'r') as consumptionDataJsonFile:
+        consumptionDataJson = json.load(consumptionDataJsonFile)
+    return consumptionDataJson["requested"], consumptionDataJson["preferencies"]["recipes"], consumptionDataJson["preferencies"]["factories"]
 
 
-def category2Factory(category: str, craftingFactories: CraftingFactories) -> tuple[str, CraftingFactory]:
-    for name, craftingFactory in craftingFactories.items():
-        if category in craftingFactory.categories:
-            return name, craftingFactory
-    return None
+def computeConsumptionRates(recipesByResult: RecipesByResult, requestedRates: dict) -> tuple[dict,dict]:
+    consumptionRate = {}
+    noRecipes = {}
+    while len(requestedRates)>0:
+        requestedName, requestedRate = requestedRates.popitem()
+        if requestedRate > 0.0 and requestedName in recipesByResult:
+            for ratio, recipe in recipesByResult[requestedName]:
+                productionCount = requestedRate / (recipe.results[requestedName] / recipe.time) * ratio
+                if recipe.name not in consumptionRate:
+                    consumptionRate[recipe.name] = {"productionCount": 0.0, "category": recipe.category, "results": {}, "ingredients": {}}
+                consumptionRate[recipe.name]["productionCount"] += productionCount
+                for resultName, resultPerProduction in recipe.results.items():
+                    resultRate = resultPerProduction / recipe.time * productionCount
+                    if resultName not in consumptionRate[recipe.name]["results"]:
+                        consumptionRate[recipe.name]["results"][resultName] = 0.0
+                    consumptionRate[recipe.name]["results"][resultName] += resultRate
+                    if requestedName != resultName:
+                        if resultName not in requestedRates:
+                            requestedRates[resultName] = 0.0
+                        requestedRates[resultName] -= resultRate
+                        if requestedRates[resultName] == 0.0:
+                            del requestedRates[resultName]
+                for ingredientName, ingredientPerProduction in recipe.ingredients.items():
+                    ingredientRate = ingredientPerProduction / recipe.time * productionCount
+                    if ingredientName not in consumptionRate[recipe.name]["ingredients"]:
+                        consumptionRate[recipe.name]["ingredients"][ingredientName] = 0.0
+                    consumptionRate[recipe.name]["ingredients"][ingredientName] += ingredientRate
+                    if ingredientName not in requestedRates:
+                        requestedRates[ingredientName] = 0.0
+                    requestedRates[ingredientName] += ingredientRate
+        elif not math.isclose(requestedRate, 0.0, abs_tol=0.01):
+            if requestedName not in noRecipes:
+                noRecipes[requestedName] = 0.0
+            noRecipes[requestedName] += requestedRate
+    return consumptionRate, noRecipes
 
 
-def conso2Html(conso:dict, requesteds:dict, craftingFactories: CraftingFactories, htmlFilePath: string, itemsPngCopyFolderPath: string):
+def craftingFactoriesByName2CraftingFactoriesByCategories(craftingFactoriesByName: CraftingFactoriesByName, factoriesPreferences: dict) -> CraftingFactoriesByCategories:
+    craftingFactoriesByCategories = CraftingFactoriesByCategories()
+    for craftingFactory in craftingFactoriesByName.values():
+        for category in craftingFactory.categories:
+            ratio = 1.0
+            if category in factoriesPreferences:
+                if craftingFactory.name == factoriesPreferences[category]:
+                    craftingFactoriesByCategories[category] = craftingFactory
+            elif category in craftingFactoriesByCategories:
+                raise ValueError("There are more than one factory to produce with category {} you have to set your preferencies in consumption data file".format(category))
+            else:
+                craftingFactoriesByCategories[category] = craftingFactory
+    return craftingFactoriesByCategories
+
+
+def consumption2Html(consumptionRate:dict, requesteds:dict, craftingFactoriesByCategories: CraftingFactoriesByCategories, htmlFilePath: string, itemsPngCopyFolderPath: string):
     doc, tag, text = yattag.Doc().tagtext()
     with tag('html'):
         with tag("head"):
@@ -371,7 +415,7 @@ def conso2Html(conso:dict, requesteds:dict, craftingFactories: CraftingFactories
                         text("factory count")
                     with tag('th'):
                         text("ingredients")
-                for production in conso.values():
+                for production in consumptionRate.values():
                     with tag('tr'):
                         with tag('td'):
                             isFirst = True
@@ -382,9 +426,9 @@ def conso2Html(conso:dict, requesteds:dict, craftingFactories: CraftingFactories
                                 isFirst = False
                                 doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, resultName+".png"), alt=resultName, title=resultName)
                         with tag('td'):
-                            craftingFactoryName, craftingFactory = category2Factory(production["category"], craftingFactories)
+                            craftingFactory = craftingFactoriesByCategories[production["category"]]
                             text("{:.1f}".format(production["productionCount"]/craftingFactory.speed))
-                            doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, craftingFactoryName+".png"), alt=craftingFactoryName, title=craftingFactoryName)
+                            doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, craftingFactory.name+".png"), alt=craftingFactory.name, title=craftingFactory.name)
                         with tag('td'):
                             isFirst = True
                             for ingredientName, ingredientRate in production["ingredients"].items():
@@ -417,19 +461,20 @@ def loadGroups(jsonFilePath: string) -> dict[str, list[str]]:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate SVG recipe dependency graph from factorio game data.')
-    parser.add_argument('-f', '--factoriopath', type=str, help="Factorio path to load recipes")
-    parser.add_argument('-o', '--open', type=argparse.FileType('r'), help="Load recipes from json file")
+    parser.add_argument('-f', '--factoriopath', type=pathlib.Path, help="Factorio path to load recipes")
+    parser.add_argument('-o', '--open', type=pathlib.Path, help="Load recipes from json file")
     parser.add_argument('-r', '--recipes', type=str, nargs='+', help="To remove recipes list by recipe name")
     parser.add_argument('-i', '--items', type=str, nargs='+', help="To remove items list by ingredients or result name")
     parser.add_argument('-l', '--leafe', action="store_true", help="To remove items at the end of the tree")
     parser.add_argument('-k', '--keep', action="store_true", help="To keep only recipe with at least one result at the end of the tree")
-    parser.add_argument('-j', '--json', type=argparse.FileType('w'), help="Generate a recipe json file with the given file name")
-    parser.add_argument('-u', '--usage', type=argparse.FileType('w'), help="Generate the given HTML page with for each ingredient the usage")
-    parser.add_argument('-d', '--dot', type=argparse.FileType('w'), help="Generate the given graphviz dot file in the folder path")
-    parser.add_argument('-c', '--conso', type=argparse.FileType('w'), help="Generate the given HTML page with for each recipes the consume quantity")
-    parser.add_argument('-a', '--factories', type=argparse.FileType('r'), help="Factories data used when generate consume quantity")
-    parser.add_argument('-g', '--groups', type=argparse.FileType('r'), help="Generate a json recipe file for each group in the given file")
-    parser.add_argument('-p', '--groupspath', type=str, help="folder path to generate recipe file from group")
+    parser.add_argument('-j', '--json', type=pathlib.Path, help="Generate a recipe json file with the given file name")
+    parser.add_argument('-u', '--usage', type=pathlib.Path, help="Generate the given HTML page with for each ingredient the usage")
+    parser.add_argument('-d', '--dot', type=pathlib.Path, help="Generate the given graphviz dot file in the folder path")
+    parser.add_argument('-c', '--consumption', type=pathlib.Path, help="Generate the given HTML page with for each recipes the consume quantity")
+    parser.add_argument('-a', '--factories', type=pathlib.Path, help="Factories data used when generate consumption")
+    parser.add_argument('-s', '--consumptionData', type=pathlib.Path, help="Consumption requested and preferencies used when generate consumption")
+    parser.add_argument('-g', '--groups', type=pathlib.Path, help="Generate a json recipe file for each group in the given file")
+    parser.add_argument('-p', '--groupspath', type=pathlib.Path, help="folder path to generate recipe file from group")
     args = parser.parse_args()
 
     if args.factoriopath:
@@ -443,7 +488,7 @@ if __name__ == '__main__':
         recipes = getRecipes(args.factoriopath, recipesToRemove)
 
     if args.open:
-        recipes = loadRecipes(args.open.name)
+        recipes = loadRecipes(args.open)
 
     if args.items != None:
         recipesRemoveItem(recipes, set(args.items))
@@ -456,31 +501,36 @@ if __name__ == '__main__':
         keepOnlyLeafe(recipes)
 
     if args.json:
-        writeRecipesJsonFile(recipes, args.json.name)
-        print("Recipe jsonfile \"{}\" writen".format(args.json.name))
+        writeRecipesJsonFile(recipes, args.json)
+        print("Recipe jsonfile \"{}\" writen".format(args.json))
 
     if args.usage:
         usage = ingredientsByUsage(recipes)
-        itemsPngCopyFolderPath = os.path.join(os.path.dirname(args.usage.name), "img")
+        itemsPngCopyFolderPath = os.path.join(os.path.dirname(args.usage), "img")
         itemsPngCopyFolderPathes.add(itemsPngCopyFolderPath)
-        ingredientsByUsage2Html(usage, args.usage.name, "img")
+        ingredientsByUsage2Html(usage, args.usage, "img")
 
     if args.dot:
-        itemsPngCopyFolderPath = os.path.join(os.path.dirname(args.dot.name), "img")
+        itemsPngCopyFolderPath = os.path.join(os.path.dirname(args.dot), "img")
         itemsPngCopyFolderPathes.add(itemsPngCopyFolderPath)
-        generateDot(recipes, args.dot.name, "img")
+        generateDot(recipes, args.dot, "img")
 
-    if args.conso:
+    if args.consumption:
         if not args.factories:
             raise ValueError("To generate consumtion you need to provide factories file")
-        craftingFactories = loadFactories(args.factories.name)
-        itemsPngCopyFolderPath = os.path.join(os.path.dirname(args.conso.name), "img")
+        if not args.consumptionData:
+            raise ValueError("To generate consumtion you need to provide consumption data file")
+        craftingFactoriesByName = loadFactories(args.factories)
+        requestedRates, recipesPreferences, factoriesPreferences = loadConsumptionData(args.consumptionData)
+        itemsPngCopyFolderPath = os.path.join(os.path.dirname(args.consumption), "img")
         itemsPngCopyFolderPathes.add(itemsPngCopyFolderPath)
-        conso,requesteds = generateConso(recipes, {"production-science-pack": 0.5})
-        conso2Html(conso, requesteds, craftingFactories, args.conso.name, "img")
+        recipesByResult = recipesByName2recipesByResult(recipes, recipesPreferences)
+        consumption, requestedRates = computeConsumptionRates(recipesByResult, requestedRates)
+        craftingFactoriesByCategories = craftingFactoriesByName2CraftingFactoriesByCategories(craftingFactoriesByName, factoriesPreferences)
+        consumption2Html(consumption, requestedRates, craftingFactoriesByCategories, args.consumption, "img")
 
     if args.groups:
-        recipesGroups = loadGroups(args.groups.name)
+        recipesGroups = loadGroups(args.groups)
         outFolderPath = "."
         if args.groupspath:
             outFolderPath = args.groupspath
