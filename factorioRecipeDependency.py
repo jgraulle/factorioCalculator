@@ -145,11 +145,11 @@ def recipesRemoveItem(recipes: Recipes, itemsToRemove):
         del recipes[recipeName]
 
 
-def writeRecipesJsonFile(recipes: Recipes, fileName: string):
+def writeRecipesJsonFile(recipes: Recipes, filePath: string):
     jsonData = {}
     for recipeName, recipe in recipes.items():
         jsonData[recipeName] = {"ingredients": recipe.ingredients, "time": recipe.time, "results": recipe.results, "category": recipe.category}
-    with open(fileName, 'w') as jsonFile:
+    with open(filePath, 'w') as jsonFile:
         json.dump(jsonData, jsonFile, ensure_ascii=False, indent=3)
 
 
@@ -364,6 +364,12 @@ def conso2Html(conso:dict, requesteds:dict, htmlFilePath: string, itemsPngCopyFo
         htmlFile.write(bytes(html, "utf8"))
 
 
+def loadGroups(jsonFilePath: string) -> dict[str, list[str]]:
+    with open(jsonFilePath, 'r') as jsonFile:
+        recipesGroups = json.load(jsonFile)
+    return recipesGroups
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate SVG recipe dependency graph from factorio game data.')
     parser.add_argument('-f', '--factoriopath', type=str, help="Factorio path to load recipes")
@@ -376,6 +382,8 @@ if __name__ == '__main__':
     parser.add_argument('-u', '--usage', type=argparse.FileType('w'), help="Generate the given HTML page with for each ingredient the usage")
     parser.add_argument('-d', '--dot', type=argparse.FileType('w'), help="Generate the given graphviz dot file in the folder path")
     parser.add_argument('-c', '--conso', type=argparse.FileType('w'), help="Generate the given HTML page with for each recipes the consume quantity")
+    parser.add_argument('-g', '--groups', type=argparse.FileType('r'), help="Generate a json recipe file for each group in the given file")
+    parser.add_argument('-p', '--groupspath', type=str, help="folder path to generate recipe file from group")
     args = parser.parse_args()
 
     if args.factoriopath:
@@ -421,6 +429,17 @@ if __name__ == '__main__':
         itemsPngCopyFolderPathes.add(itemsPngCopyFolderPath)
         conso,requesteds = generateConso(recipes, {"production-science-pack": 0.5}, args.conso.name, "img")
         conso2Html(conso, requesteds, args.conso.name, "img")
+
+    if args.groups:
+        recipesGroups = loadGroups(args.groups.name)
+        outFolderPath = "."
+        if args.groupspath:
+            outFolderPath = args.groupspath
+        for groupName, recipesNames in recipesGroups.items():
+            recipesGroup = {}
+            for recipeName in recipesNames:
+                recipesGroup[recipeName] = recipes[recipeName]
+            writeRecipesJsonFile(recipesGroup, os.path.join(outFolderPath, "recipes"+groupName[0].upper()+groupName[1:]+".json"))
 
     if args.factoriopath:
         for folderPath in itemsPngCopyFolderPathes:
