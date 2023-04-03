@@ -10,20 +10,22 @@
    },
    "preferencies": {
       "recipes": {
-         "petroleum-gas": [
-            {"heavy-oil-cracking": "overproduction"},
-            {"light-oil-cracking": "overproduction"},
-            {"light-oil-cracking": 0.4359},
-            {"advanced-oil-processing": 0.5641}
-         ],
+         "overproduction-end-order": ["light-oil", "petroleum-gas"],
          "heavy-oil": [
             {"advanced-oil-processing": 1.0}
          ],
          "light-oil": [
-            {"heavy-oil-cracking": 1.0}
+            {"heavy-oil-cracking":"overproduction"},
+            {"heavy-oil-cracking": 0.2941},
+            {"advanced-oil-processing": 0.7059}
+         ],
+         "petroleum-gas": [
+            {"light-oil-cracking": "overproduction"},
+            {"light-oil-cracking": 0.4359},
+            {"advanced-oil-processing": 0.5641}
          ],
          "solid-fuel": [
-            {"solid-fuel-from-petroleum-gas": 1.0}
+            {"solid-fuel-from-light-oil": 1.0}
          ],
          "uranium-235": [
             {"kovarex-enrichment-process": 1.0}

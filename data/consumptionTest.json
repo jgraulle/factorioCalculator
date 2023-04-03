@@ -1,6 +1,9 @@
 {
    "requested": {
-      "production-science-pack": 0.5
+      "lubricant": 0.5,
+      "sulfur": 0.5,
+      "plastic-bar": 0.5,
+      "light-oil": 5.0
    },
    "preferencies": {
       "recipes": {

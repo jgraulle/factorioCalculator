@@ -10,7 +10,7 @@ all: out/recipesRobotAll.svg out/recipesBeltInserterAll.svg \
 	out/recipesModuleAll.svg out/recipesUraniumAll.svg \
 	out/recipesNoNeedAll.svg out/recipesSpidertronAll.svg \
 	out/recipesAmmoAll.svg out/consumptionAllScience.html \
-	out/consumptionProductionScience.html
+	out/consumptionProductionScience.html out/consumptionTest.html
 
 /tmp/%All.dot: /tmp/%.json factorioRecipeDependency.py
 	./factorioRecipeDependency.py --open $< --dot $@

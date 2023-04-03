@@ -11,6 +11,8 @@ import yattag
 from typing import NamedTuple
 import math
 import pathlib
+from collections import Counter
+
 
 debug = False
 def printDebug(toPrint: str):
@@ -343,83 +345,121 @@ def loadFactorioData(factorioDataJsonFilePath: string) -> tuple[CraftingFactorie
     return craftingFactories, recipes, set(factorioDataJson["recipes-to-remove"]), factorioDataJson["item-png-renames"]
 
 
-def loadConsumptionData(consumptionDataJsonFilePath) -> tuple[dict, dict, dict[str, str]]:
+def loadConsumptionData(consumptionDataJsonFilePath) -> tuple[dict, tuple[dict, list[str]], dict[str, str]]:
     with open(consumptionDataJsonFilePath, 'r') as consumptionDataJsonFile:
         consumptionDataJson = json.load(consumptionDataJsonFile)
-    return consumptionDataJson["requested"], consumptionDataJson["preferencies"]["recipes"], consumptionDataJson["preferencies"]["factories"]
+    overproductionEndOrder = []
+    if "overproduction-end-order" in consumptionDataJson["preferencies"]["recipes"]:
+        overproductionEndOrder = consumptionDataJson["preferencies"]["recipes"].pop("overproduction-end-order")
+    return consumptionDataJson["requested"], (consumptionDataJson["preferencies"]["recipes"], overproductionEndOrder), consumptionDataJson["preferencies"]["factories"]
 
 
-def computeConsumptionRates(recipesByResult: RecipesByResult, requestedRates: dict, craftingFactoriesByName: CraftingFactoriesByName, factoriesPreferences: dict) -> tuple[dict, dict, dict]:
+def computeConsumptionRates(recipesByResult: RecipesByResult, inputRequestedRates: dict, craftingFactoriesByName: CraftingFactoriesByName, factoriesPreferences: dict, overproductionEndOrder: list[str]) -> tuple[dict, dict, dict]:
     craftingFactoriesByCategories = craftingFactoriesByName2CraftingFactoriesByCategories(craftingFactoriesByName, factoriesPreferences)
     consumptionRate = {}
-    noRecipes = {}
-    overproduction = {}
+    requestedRates = dict(inputRequestedRates)
+    toProduce = set(requestedRates.keys())
+    toProduceAtEnd = set()
+    noRecipes = set()
+    overproduction = set()
     counter = 0
-    requestedRatesEnd = {}
-    while len(requestedRates)>0 or len(requestedRatesEnd)>0:
-        if len(requestedRates)>0:
-            requestedName, requestedRate = requestedRates.popitem()
+    ZERO_TOLERANCE = 0.0004
+    while len(toProduce)>0 or len(toProduceAtEnd)>0:
+        if debug:
+            consumption2Html(consumptionRate, {itemName: requestedRates[itemName] for itemName in toProduce|toProduceAtEnd|noRecipes},
+                             {itemName: requestedRates[itemName] for itemName in overproduction},
+                             "out/{}.html".format(counter), "img", "{}.html".format(counter-1), "{}.html".format(counter+1))
+        counter += 1
+        # Get the next item to produce
+        # If still have item at begin
+        if len(toProduce)>0:
+            # Get item from begin
+            requestedName = toProduce.pop()
+            # If a recipe for this item is mark "overproduction"
             if requestedName in recipesByResult:
                 isOverproduction = False
                 for ratio, _ in recipesByResult[requestedName]:
                     if ratio == "overproduction":
                         isOverproduction = True
+                        break
                 if isOverproduction:
-                    if requestedName not in requestedRatesEnd:
-                        requestedRatesEnd[requestedName] = 0.0
-                    requestedRatesEnd[requestedName] += requestedRate
+                    # Move it in end
+                    printDebug("{}: move {} to end".format(counter, requestedName))
+                    toProduceAtEnd.add(requestedName)
                     continue
         else:
-            requestedName, requestedRate = requestedRatesEnd.popitem()
-        if math.isclose(requestedRate, 0.0, abs_tol=0.0001):
-            printDebug("{}: {} == 0.0".format(counter, requestedName))
-            continue
-        elif requestedRate < 0.0:
-            if requestedName not in overproduction:
-                overproduction[requestedName] = 0.0
-            overproduction[requestedName] += requestedRate
-            printDebug("{}: move {} to overproduction".format(counter, requestedName))
-        elif requestedName in recipesByResult:
-            if requestedName in overproduction:
-                requestedRate += overproduction[requestedName]
-                del overproduction[requestedName]
-                if math.isclose(requestedRate, 0.0, abs_tol=0.01):
-                    printDebug("{}: consume {} from overproduction and now 0".format(counter, requestedName))
-                    continue
-                elif requestedRate < 0.0:
-                    overproduction[requestedName] = requestedRate
-                    printDebug("{}: consume {} from overproduction and now overproduction {}".format(counter, requestedName, requestedRate))
-                    continue
-                else:
-                    printDebug("{}: consume {} from overproduction and now requested {}".format(counter, requestedName, requestedRate))
+            # Get item from end, but try with order in overproductionEndOrder
+            requestedName = ""
+            while len(overproductionEndOrder)>0:
+                requestedNameTmp = overproductionEndOrder.pop(0)
+                if requestedNameTmp in toProduceAtEnd:
+                    toProduceAtEnd.remove(requestedNameTmp)
+                    requestedName = requestedNameTmp
+                    break
+            # If no item from overproductionEndOrder get first one
+            if requestedName == "":
+                requestedName = toProduceAtEnd.pop()
+        # Produce this item
+        printDebug("{}: need to produce {} of {}".format(counter, requestedRates[requestedName], requestedName))
+        assert(not math.isclose(requestedRates[requestedName], 0.0, abs_tol=ZERO_TOLERANCE))
+        assert(requestedRates[requestedName] > 0.0)
+        if requestedName in recipesByResult:
+            # We have at least 1 recipe
+            # For each recipe to produce this item
+            requestedRate = requestedRates[requestedName]
             for ratio, recipe in recipesByResult[requestedName]:
                 if ratio == "overproduction":
+                    # Try to produce maximum rate from overproduction
                     productionCount = 0.0
                     for ingredientName, ingredientPerProduction in recipe.ingredients.items():
                         if ingredientName in overproduction:
-                            productionCountTmp = -overproduction[ingredientName] / (ingredientPerProduction / recipe.time)
+                            productionCountTmp = -requestedRates[ingredientName] / (ingredientPerProduction / recipe.time)
                             printDebug("{}: try to produce {} with overproduction of {} and recipe {} compute {}".format(counter, requestedName, ingredientName, recipe.name, productionCountTmp))
                             productionCount = max(productionCount, productionCountTmp)
                     if productionCount == 0.0:
                         continue
                 else:
-                    productionCount = requestedRate / (recipe.results[requestedName] / recipe.time) * ratio
-                    printDebug("{}: produce {} with {} recipe".format(counter, requestedName, recipe.name))
+                    # Compute rate to produce
+                    productionCount = requestedRate * ratio / (recipe.results[requestedName] / recipe.time)
+                    printDebug("{}: produce {} of {} with {} recipe".format(counter, requestedRate*ratio, requestedName, recipe.name))
+                # If new recipe
                 if recipe.name not in consumptionRate:
+                    # Add empty template
                     consumptionRate[recipe.name] = {"production-count": 0.0, "factories-name": craftingFactoriesByCategories[recipe.category].name, "factories-count": 0.0, "electric-consumption": 0.0, "category": recipe.category, "results": {}, "ingredients": {}}
+                # Update production count
                 consumptionRate[recipe.name]["production-count"] += productionCount
+                # Update factory count
                 consumptionRate[recipe.name]["factories-count"] += productionCount / craftingFactoriesByCategories[recipe.category].speed
+                # Update electric consumption
                 if craftingFactoriesByCategories[recipe.category].consumptionType == "electric":
                     consumptionRate[recipe.name]["electric-consumption"] = consumptionRate[recipe.name]["factories-count"] * craftingFactoriesByCategories[recipe.category].consumptionQuantity
+                # Update item produce
                 for resultName, resultPerProduction in recipe.results.items():
                     resultRate = resultPerProduction / recipe.time * productionCount
                     if resultName not in consumptionRate[recipe.name]["results"]:
                         consumptionRate[recipe.name]["results"][resultName] = 0.0
                     consumptionRate[recipe.name]["results"][resultName] += resultRate
-                    if requestedName != resultName:
-                        if resultName not in requestedRates:
-                            requestedRates[resultName] = 0.0
-                        requestedRates[resultName] -= resultRate
+                    if resultName not in requestedRates:
+                        requestedRates[resultName] = 0.0
+                        overproduction.add(resultName)
+                    requestedRates[resultName] -= resultRate
+                    printDebug("\t{}: produce {} -= {} => {}".format(counter, resultName, resultRate, requestedRates[resultName]))
+                    # If almost 0.0 remove it from all list
+                    if math.isclose(requestedRates[resultName], 0.0, abs_tol=ZERO_TOLERANCE):
+                        printDebug("\t{}: {} == 0.0 remove it from all list".format(counter, resultName))
+                        if resultName in toProduce:
+                            toProduce.remove(resultName)
+                        if resultName in toProduceAtEnd:
+                            toProduceAtEnd.remove(resultName)
+                        if resultName in overproduction:
+                            overproduction.remove(resultName)
+                        del requestedRates[resultName]
+                    # If was to produce and now overproduction
+                    elif requestedRates[resultName] < 0.0 and resultName in toProduce:
+                        printDebug("\t{}: overproduction of {}".format(counter, resultName))
+                        toProduce.remove(resultName)
+                        overproduction.add(resultName)
+                # Update item requested
                 for ingredientName, ingredientPerProduction in recipe.ingredients.items():
                     ingredientRate = ingredientPerProduction / recipe.time * productionCount
                     if ingredientName not in consumptionRate[recipe.name]["ingredients"]:
@@ -427,16 +467,37 @@ def computeConsumptionRates(recipesByResult: RecipesByResult, requestedRates: di
                     consumptionRate[recipe.name]["ingredients"][ingredientName] += ingredientRate
                     if ingredientName not in requestedRates:
                         requestedRates[ingredientName] = 0.0
+                        toProduce.add(ingredientName)
                     requestedRates[ingredientName] += ingredientRate
+                    printDebug("\t{}: consume {} += {} => {}".format(counter, ingredientName, ingredientRate, requestedRates[ingredientName]))
+                    # If almost 0.0 remove it from all list
+                    if math.isclose(requestedRates[ingredientName], 0.0, abs_tol=ZERO_TOLERANCE):
+                        printDebug("\t{}: {} == 0.0 remove it from all list".format(counter, ingredientName))
+                        if ingredientName in toProduce:
+                            toProduce.remove(ingredientName)
+                        if ingredientName in toProduceAtEnd:
+                            toProduceAtEnd.remove(ingredientName)
+                        if ingredientName in overproduction:
+                            overproduction.remove(ingredientName)
+                        del requestedRates[ingredientName]
+                    # If was overproduction and now to produce
+                    elif requestedRates[ingredientName] > 0.0 and ingredientName in overproduction:
+                        printDebug("\t{}: remove from overproduction of {}".format(counter, ingredientName))
+                        overproduction.remove(ingredientName)
+                        toProduce.add(ingredientName)
+                # If this recipe was for overproduction
+                if ratio == "overproduction":
+                    # Use remaining rate for over ratio
+                    if requestedName in requestedRates:
+                        requestedRate = requestedRates[requestedName]
+                    else:
+                        break
+
         else:
-            if requestedName not in noRecipes:
-                noRecipes[requestedName] = 0.0
-            noRecipes[requestedName] += requestedRate
+            # No recipe to produce this item
+            noRecipes.add(requestedName)
             printDebug("{}: no recipe for {}".format(counter, requestedName))
-        if debug:
-            consumption2Html(consumptionRate, noRecipes, overproduction, "out/{}.html".format(counter), "img", "{}.html".format(counter-1), "{}.html".format(counter+1))
-        counter += 1
-    return consumptionRate, noRecipes, overproduction
+    return consumptionRate, {itemName: requestedRates[itemName] for itemName in noRecipes}, {itemName: requestedRates[itemName] for itemName in overproduction}
 
 
 def craftingFactoriesByName2CraftingFactoriesByCategories(craftingFactoriesByName: CraftingFactoriesByName, factoriesPreferences: dict) -> CraftingFactoriesByCategories:
@@ -471,9 +532,11 @@ def toSiSuffix(quantity: float) -> tuple[float, str]:
     return quantity, ""
 
 
-def consumption2Html(consumptionRate:dict, noRecipes:dict, overproduction: dict, htmlFilePath: string, itemsPngCopyFolderPath: string, prev=None, next=None):
+def consumption2Html(consumptionRate: dict, noRecipes: dict, overproduction: dict, htmlFilePath: string, itemsPngCopyFolderPath: string, prev=None, next=None):
     electricTotal = 0.0
     consumptionRate = dict(sorted(consumptionRate.items()))
+    noRecipes = dict(sorted(noRecipes.items()))
+    overproduction = dict(sorted(overproduction.items()))
     doc, tag, text = yattag.Doc().tagtext()
     with tag('html'):
         with tag("head"):
@@ -538,6 +601,10 @@ def consumption2Html(consumptionRate:dict, noRecipes:dict, overproduction: dict,
                         with tag('td'):
                             text("{:.3f}".format(ingredientRate))
                             doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, ingredientName+".png"), alt=ingredientName, title=ingredientName)
+            with tag('table'):
+                with tag('tr'):
+                    with tag('th'):
+                        text("overproduction")
                 for ingredientName, ingredientRate in overproduction.items():
                     with tag('tr'):
                         with tag('td'):
@@ -628,8 +695,8 @@ if __name__ == '__main__':
         requestedRates, recipesPreferences, factoriesPreferences = loadConsumptionData(args.consumptionData)
         itemsPngCopyFolderPath = os.path.join(os.path.dirname(args.consumption), "img")
         itemsPngCopyFolderPathes.add(itemsPngCopyFolderPath)
-        recipesByResult = recipesByName2recipesByResult(recipes, recipesPreferences)
-        consumption, noRecipes, overproduction = computeConsumptionRates(recipesByResult, requestedRates, craftingFactoriesByName, factoriesPreferences)
+        recipesByResult = recipesByName2recipesByResult(recipes, recipesPreferences[0])
+        consumption, noRecipes, overproduction = computeConsumptionRates(recipesByResult, requestedRates, craftingFactoriesByName, factoriesPreferences, recipesPreferences[1])
         consumption2Html(consumption, noRecipes, overproduction, args.consumption, "img")
 
     if args.groups:
