@@ -355,8 +355,22 @@ def computeConsumptionRates(recipesByResult: RecipesByResult, requestedRates: di
     noRecipes = {}
     overproduction = {}
     counter = 0
-    while len(requestedRates)>0:
-        requestedName, requestedRate = requestedRates.popitem()
+    requestedRatesEnd = {}
+    while len(requestedRates)>0 or len(requestedRatesEnd)>0:
+        if len(requestedRates)>0:
+            requestedName, requestedRate = requestedRates.popitem()
+            if requestedName in recipesByResult:
+                isOverproduction = False
+                for ratio, _ in recipesByResult[requestedName]:
+                    if ratio == "overproduction":
+                        isOverproduction = True
+                if isOverproduction:
+                    if requestedName not in requestedRatesEnd:
+                        requestedRatesEnd[requestedName] = 0.0
+                    requestedRatesEnd[requestedName] += requestedRate
+                    continue
+        else:
+            requestedName, requestedRate = requestedRatesEnd.popitem()
         if math.isclose(requestedRate, 0.0, abs_tol=0.0001):
             printDebug("{}: {} == 0.0".format(counter, requestedName))
             continue
