@@ -532,7 +532,7 @@ def toSiSuffix(quantity: float) -> tuple[float, str]:
     return quantity, ""
 
 
-def consumption2Html(consumptionRate: dict, noRecipes: dict, overproduction: dict, htmlFilePath: string, itemsPngCopyFolderPath: string, prev=None, next=None):
+def consumption2Html(requestedRates: dict, consumptionRate: dict, noRecipes: dict, overproduction: dict, htmlFilePath: string, itemsPngCopyFolderPath: string, prev=None, next=None):
     electricTotal = 0.0
     consumptionRate = dict(sorted(consumptionRate.items()))
     noRecipes = dict(sorted(noRecipes.items()))
@@ -541,7 +541,9 @@ def consumption2Html(consumptionRate: dict, noRecipes: dict, overproduction: dic
     with tag('html'):
         with tag("head"):
             with tag("style"):
-                text("table, th, td {border: 1px solid black;border-collapse: collapse; text-align: right}")
+                text("table, th, td {border: 1px solid black;border-collapse: collapse;}")
+                text("td {text-align: right}")
+                text("th {text-align: center}")
         with tag('body'):
             if prev != None:
                 with tag('a', href=prev):
@@ -549,6 +551,16 @@ def consumption2Html(consumptionRate: dict, noRecipes: dict, overproduction: dic
             if next != None:
                 with tag('a', href=next):
                     text("Next")
+            with tag('table'):
+                with tag('tr'):
+                    with tag('th', colspan=str(len(requestedRates))):
+                        text("Requested")
+                with tag('tr'):
+                    for ingredientName, ingredientRate in requestedRates.items():
+                        with tag('td'):
+                            text("{:.3f}".format(ingredientRate))
+                            doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, ingredientName+".png"), alt=ingredientName, title=ingredientName)
+            doc.stag('br')
             with tag('table', id="mainTable"):
                 with tag('tr'):
                     with tag('th', onclick="sortTable(0)"):
@@ -594,19 +606,20 @@ def consumption2Html(consumptionRate: dict, noRecipes: dict, overproduction: dic
             doc.stag('br')
             with tag('table'):
                 with tag('tr'):
-                    with tag('th'):
+                    with tag('th', colspan=str(len(noRecipes))):
                         text("base")
-                for ingredientName, ingredientRate in noRecipes.items():
-                    with tag('tr'):
+                with tag('tr'):
+                    for ingredientName, ingredientRate in noRecipes.items():
                         with tag('td'):
                             text("{:.3f}".format(ingredientRate))
                             doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, ingredientName+".png"), alt=ingredientName, title=ingredientName)
+            doc.stag('br')
             with tag('table'):
                 with tag('tr'):
-                    with tag('th'):
+                    with tag('th', colspan=str(len(overproduction))):
                         text("overproduction")
-                for ingredientName, ingredientRate in overproduction.items():
-                    with tag('tr'):
+                with tag('tr'):
+                    for ingredientName, ingredientRate in overproduction.items():
                         with tag('td'):
                             text("{:.3f}".format(ingredientRate))
                             doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, ingredientName+".png"), alt=ingredientName, title=ingredientName)
@@ -697,7 +710,7 @@ if __name__ == '__main__':
         itemsPngCopyFolderPathes.add(itemsPngCopyFolderPath)
         recipesByResult = recipesByName2recipesByResult(recipes, recipesPreferences[0])
         consumption, noRecipes, overproduction = computeConsumptionRates(recipesByResult, requestedRates, craftingFactoriesByName, factoriesPreferences, recipesPreferences[1])
-        consumption2Html(consumption, noRecipes, overproduction, args.consumption, "img")
+        consumption2Html(requestedRates, consumption, noRecipes, overproduction, args.consumption, "img")
 
     if args.groups:
         recipesGroups = loadGroups(args.groups)
