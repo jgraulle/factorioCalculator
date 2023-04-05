@@ -562,47 +562,50 @@ def consumption2Html(requestedRates: dict, consumptionRate: dict, noRecipes: dic
                             doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, ingredientName+".png"), alt=ingredientName, title=ingredientName)
             doc.stag('br')
             with tag('table', id="mainTable"):
-                with tag('tr'):
-                    with tag('th', onclick="sortTable(0)"):
-                        text("result")
-                    with tag('th', onclick="sortTable(1)"):
-                        text("factory count")
-                    with tag('th', onclick="sortTable(2)"):
-                        text("ingredients")
-                    with tag('th', onclick="sortTable(3)"):
-                        text("electricity")
-                for production in consumptionRate.values():
+                with tag('thead'):
                     with tag('tr'):
-                        with tag('td', ("data-sort", str(max(production["results"].values())))):
-                            isFirst = True
-                            for resultName, resultRate in production["results"].items():
-                                if not isFirst:
-                                    text(" + ")
-                                text("{:.3f}".format(resultRate))
-                                isFirst = False
-                                doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, resultName+".png"), alt=resultName, title=resultName)
-                        with tag('td', ("data-sort", str(production["factories-count"]))):
-                            text("{:.1f}".format(production["factories-count"]))
-                            doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, production["factories-name"]+".png"), alt=production["factories-name"], title=production["factories-name"])
-                        with tag('td', ("data-sort", str(max(production["ingredients"].values())))):
-                            isFirst = True
-                            for ingredientName, ingredientRate in production["ingredients"].items():
-                                if not isFirst:
-                                    text(" + ")
-                                text("{:.3f}".format(ingredientRate))
-                                isFirst = False
-                                doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, ingredientName+".png"), alt=ingredientName, title=ingredientName)
-                        with tag('td', ("data-sort", str(production["electric-consumption"]))):
-                            electric, suffix = toSiSuffix(production["electric-consumption"])
+                        with tag('th', onclick='sortTable("mainTable", 0)'):
+                            text("result")
+                        with tag('th', onclick='sortTable("mainTable", 1)'):
+                            text("factory count")
+                        with tag('th', onclick='sortTable("mainTable", 2)'):
+                            text("ingredients")
+                        with tag('th', onclick='sortTable("mainTable", 3)'):
+                            text("electricity")
+                with tag('tbody'):
+                    for production in consumptionRate.values():
+                        with tag('tr'):
+                            with tag('td', ("data-sort", str(max(production["results"].values())))):
+                                isFirst = True
+                                for resultName, resultRate in production["results"].items():
+                                    if not isFirst:
+                                        text(" + ")
+                                    text("{:.3f}".format(resultRate))
+                                    isFirst = False
+                                    doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, resultName+".png"), alt=resultName, title=resultName)
+                            with tag('td', ("data-sort", str(production["factories-count"]))):
+                                text("{:.1f}".format(production["factories-count"]))
+                                doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, production["factories-name"]+".png"), alt=production["factories-name"], title=production["factories-name"])
+                            with tag('td', ("data-sort", str(max(production["ingredients"].values())))):
+                                isFirst = True
+                                for ingredientName, ingredientRate in production["ingredients"].items():
+                                    if not isFirst:
+                                        text(" + ")
+                                    text("{:.3f}".format(ingredientRate))
+                                    isFirst = False
+                                    doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, ingredientName+".png"), alt=ingredientName, title=ingredientName)
+                            with tag('td', ("data-sort", str(production["electric-consumption"]))):
+                                electric, suffix = toSiSuffix(production["electric-consumption"])
+                                text("{:.1f}{}W".format(electric, suffix))
+                                electricTotal += production["electric-consumption"]
+                with tag('tfoot'):
+                    with tag('tr'):
+                        doc.stag('td')
+                        doc.stag('td')
+                        doc.stag('td')
+                        with tag('td'):
+                            electric, suffix = toSiSuffix(electricTotal)
                             text("{:.1f}{}W".format(electric, suffix))
-                            electricTotal += production["electric-consumption"]
-                with tag('tr'):
-                    doc.stag('td')
-                    doc.stag('td')
-                    doc.stag('td')
-                    with tag('td'):
-                        electric, suffix = toSiSuffix(electricTotal)
-                        text("{:.1f}{}W".format(electric, suffix))
             doc.stag('br')
             with tag('table'):
                 with tag('tr'):

@@ -1,29 +1,36 @@
 function getSortValue(table, rowIndex, columnIndex)
 {
-    return table.rows[rowIndex].getElementsByTagName("td")[columnIndex].getAttribute("data-sort")
+    return table.tBodies[0].rows[rowIndex].getElementsByTagName("td")[columnIndex].getAttribute("data-sort")
 }
 
-function sortTable(columnIndex)
+function sortTable(tableId, columnIndex)
 {
-    var table = document.getElementById("mainTable");
+    var table = document.getElementById(tableId);
     direction = 0
     if (table.hasAttribute("data-sort-column") && table.hasAttribute("data-sort-direction"))
     {
         if (columnIndex == table.getAttribute("data-sort-column") && table.getAttribute("data-sort-direction") == 0)
             direction = -1
     }
-    // First row is table header, last row is total
+    // First row is table header
     var isMoved = true
     while (isMoved)
     {
         isMoved = false
-        for (rowIndex = 1; rowIndex < table.rows.length-2; ++rowIndex)
+        for (rowIndex = 0; rowIndex < table.tBodies[0].rows.length-1; ++rowIndex)
         {
-            var sortValue1 = parseFloat(getSortValue(table, rowIndex, columnIndex))
-            var sortValue2 = parseFloat(getSortValue(table, rowIndex+1, columnIndex))
+            var sortValue1 = getSortValue(table, rowIndex, columnIndex)
+            var sortValue1AsFloat = parseFloat(sortValue1)
+            var sortValue2 = getSortValue(table, rowIndex+1, columnIndex)
+            var sortValue2AsFloat = parseFloat(sortValue2)
+            if (!isNaN(sortValue1AsFloat) && !isNaN(sortValue2AsFloat))
+            {
+              sortValue1 = sortValue1AsFloat
+              sortValue2 = sortValue2AsFloat
+            }
             if ((sortValue1>sortValue2 && direction==0) || (sortValue1<sortValue2 && direction==-1))
             {
-                table.rows[rowIndex].parentNode.insertBefore(table.rows[rowIndex+1], table.rows[rowIndex]);
+                table.tBodies[0].rows[rowIndex].parentNode.insertBefore(table.tBodies[0].rows[rowIndex+1], table.tBodies[0].rows[rowIndex]);
                 isMoved = true
             }
         }
