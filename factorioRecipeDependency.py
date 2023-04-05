@@ -639,92 +639,98 @@ def loadGroups(jsonFilePath: string) -> dict[str, list[str]]:
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Generate SVG recipe dependency graph from factorio game data.')
-    parser.add_argument('-f', '--factoriopath', type=pathlib.Path, help="Factorio path to load recipes")
-    parser.add_argument('-o', '--open', type=pathlib.Path, help="Load recipes from json file")
-    parser.add_argument('-r', '--recipes', type=str, nargs='+', help="To remove recipes list by recipe name")
-    parser.add_argument('-i', '--items', type=str, nargs='+', help="To remove items list by ingredients or result name")
-    parser.add_argument('-l', '--leafe', action="store_true", help="To remove items at the end of the tree")
-    parser.add_argument('-k', '--keep', action="store_true", help="To keep only recipe with at least one result at the end of the tree")
-    parser.add_argument('-j', '--json', type=pathlib.Path, help="Generate a recipe json file with the given file name")
-    parser.add_argument('-u', '--usage', type=pathlib.Path, help="Generate the given HTML page with for each ingredient the usage")
-    parser.add_argument('-d', '--dot', type=pathlib.Path, help="Generate the given graphviz dot file in the folder path")
-    parser.add_argument('-c', '--consumption', type=pathlib.Path, help="Generate the given HTML page with for each recipes the consume quantity")
-    parser.add_argument('-a', '--factorioData', type=pathlib.Path, help="Recipes and factories data used when generate recipes and consumption")
-    parser.add_argument('-s', '--consumptionData', type=pathlib.Path, help="Consumption requested and preferencies used when generate consumption")
-    parser.add_argument('-g', '--groups', type=pathlib.Path, help="Generate a json recipe file for each group in the given file")
-    parser.add_argument('-p', '--groupspath', type=pathlib.Path, help="folder path to generate recipe file from group")
+    parser = argparse.ArgumentParser(description="""Generate recipes data from factorio game data.""")
+    # Recipes loarders
+    recipesLoarderArgs = parser.add_mutually_exclusive_group(required=True)
+    recipesLoarderArgs.add_argument("--factorio-path", type=pathlib.Path, help="Load recipes from factorio path")
+    recipesLoarderArgs.add_argument("--input-json", type=pathlib.Path, help="Load recipes from json file")
+    # Recipes filters
+    recipesFilterArgs = parser.add_argument_group("Recipes filters")
+    recipesFilterArgs.add_argument("--remove-recipes", type=str, nargs='+', help="To remove recipes list by recipe name")
+    recipesFilterArgs.add_argument('--remove-items', type=str, nargs='+', help="To remove items list by ingredients or result name")
+    recipesFilterArgs.add_argument("--remove-leafes", action="store_true", help="To remove items at the end of the tree")
+    recipesFilterArgs.add_argument("--keep-leafes-only", action="store_true", help="To keep only recipe with at least one result at the end of the tree")
+    # Recipes writers
+    recipesWritersArgs = parser.add_argument_group("Recipes writers")
+    recipesWritersArgs.add_argument("--output-json", type=pathlib.Path, help="Generate the given json file")
+    recipesWritersArgs.add_argument("--output-html-usage", type=pathlib.Path, help="Generate the given HTML page with for each ingredient the usage")
+    recipesWritersArgs.add_argument("--output-dot", type=pathlib.Path, help="Generate the given graphviz dot file")
+    recipesWritersArgs.add_argument("--output-html-consumption", type=pathlib.Path, help="Generate the given HTML page with for each recipes the consume rate")
+    recipesWritersArgs.add_argument('--output-groups-dir', type=pathlib.Path, help="Folder path to generate recipe file from group")
+    recipesWritersArgs.add_argument('--output-png-dir', type=pathlib.Path, help="Folder path to generate png for each item from factorio path")
+    # Additionnal input arguments
+    recipesAddInputsArgs = parser.add_argument_group("Additionnal input arguments")
+    recipesAddInputsArgs.add_argument('--input-factorio-data', type=pathlib.Path, help="Recipes and factories data used when generate consumption and recipes from factorio path")
+    recipesAddInputsArgs.add_argument('--input-consumption-data', type=pathlib.Path, help="Consumption requested and preferencies used when generate consumption")
+    recipesAddInputsArgs.add_argument('--input-groups-data', type=pathlib.Path, help="Generate a json recipe file for each group in the given file")
     args = parser.parse_args()
 
-    itemsPngCopyFolderPathes = set()
+    # Load factorio data
     craftingFactoriesByName = {}
     recipesToAdd = RecipesByName()
     recipesToRemove = set()
+    itemPngRenames = {}
+    if args.input_factorio_data:
+        craftingFactoriesByName, recipesToAdd, recipesToRemove, itemPngRenames = loadFactorioData(args.input_factorio_data)
 
-    if args.factorioData:
-        craftingFactoriesByName, recipesToAdd, recipesToRemove, itemPngRenames = loadFactorioData(args.factorioData)
+    # Recipes loarders
+    if args.factorio_path:
+        factorioVersion = getVersion(args.factorio_path)
+        print("Load recipes from factorio version {}".format(factorioVersion))
+        recipesByName = getRecipes(args.factorio_path, recipesToRemove)
+        recipesByName.update(recipesToAdd)
+    if args.input_json:
+        print("Load recipes from {}".format(args.input_json))
+        recipesByName = loadRecipes(args.input_json)
 
-    if args.factoriopath:
-        factorioVersion = getVersion(args.factoriopath)
-        print("Factorio version:", factorioVersion)
-        if args.recipes != None:
-            recipesToRemove |= set(args.recipes)
-        recipes = getRecipes(args.factoriopath, recipesToRemove)
-        recipes.update(recipesToAdd)
+    # Recipes filters
+    if args.remove_recipes:
+        print("Filter recipes {}".format(args.remove_recipes))
+        for recipeToRemove in args.remove_recipes:
+            recipesByName.popitem(recipeToRemove)
+    if args.remove_items:
+        print("Filter items {}".format(args.remove_items))
+        recipesRemoveItem(recipesByName, set(args.remove_items))
+    if args.remove_leafes:
+        print("Filter leafes")
+        removeLeafe(recipesByName)
+    if args.keep_leafes_only:
+        print("Keep only leafes")
+        keepOnlyLeafe(recipesByName)
 
-    if args.open:
-        recipes = loadRecipes(args.open)
-
-    if args.items != None:
-        recipesRemoveItem(recipes, set(args.items))
-
-    if args.leafe:
-        removeLeafe(recipes)
-
-    if args.keep:
-        keepOnlyLeafe(recipes)
-
-    if args.json:
-        writeRecipesJsonFile(recipes, args.json)
-        print("Recipe jsonfile \"{}\" writen".format(args.json))
-        if args.factoriopath:
-            itemsPngCopyFolderPath = os.path.join(os.path.dirname(args.json), "img")
-            itemsPngCopyFolderPathes.add(itemsPngCopyFolderPath)
-
-    if args.usage:
-        usage = ingredientsByUsage(recipes)
-        itemsPngCopyFolderPath = os.path.join(os.path.dirname(args.usage), "img")
-        itemsPngCopyFolderPathes.add(itemsPngCopyFolderPath)
-        ingredientsByUsage2Html(usage, args.usage, "img")
-
-    if args.dot:
-        itemsPngCopyFolderPath = os.path.join(os.path.dirname(args.dot), "img")
-        itemsPngCopyFolderPathes.add(itemsPngCopyFolderPath)
-        generateDot(recipes, args.dot, "img")
-
-    if args.consumption:
-        if not args.consumptionData:
+    # Recipes writers
+    if args.output_json:
+        writeRecipesJsonFile(recipesByName, args.output_json)
+        print("Recipe jsonfile \"{}\" writen".format(args.output_json))
+    if args.output_html_usage:
+        usage = ingredientsByUsage(recipesByName)
+        ingredientsByUsage2Html(usage, args.output_html_usage, "img")
+        print("HTML file \"{}\" writen".format(args.output_html_usage))
+    if args.output_dot:
+        generateDot(recipesByName, args.output_dot, "img")
+        print("Graphviz dot file \"{}\" writen".format(args.output_dot))
+    if args.output_png_dir:
+        if not args.factorio_path:
+            raise ValueError("To generate png dir you need to provide factorio path")
+        if not os.path.exists(args.output_png_dir):
+            os.makedirs(args.output_png_dir)
+        itemsPngCopy(recipesByName, args.factorio_path, args.output_png_dir, itemPngRenames)
+        print("Item png file in {} writen".format(args.output_png_dir))
+    if args.output_html_consumption:
+        if not args.input_consumption_data:
             raise ValueError("To generate consumtion you need to provide consumption data file")
-        requestedRates, recipesPreferences, factoriesPreferences = loadConsumptionData(args.consumptionData)
-        itemsPngCopyFolderPath = os.path.join(os.path.dirname(args.consumption), "img")
-        itemsPngCopyFolderPathes.add(itemsPngCopyFolderPath)
-        recipesByResult = recipesByName2recipesByResult(recipes, recipesPreferences[0])
+        requestedRates, recipesPreferences, factoriesPreferences = loadConsumptionData(args.input_consumption_data)
+        recipesByResult = recipesByName2recipesByResult(recipesByName, recipesPreferences[0])
         consumption, noRecipes, overproduction = computeConsumptionRates(recipesByResult, requestedRates, craftingFactoriesByName, factoriesPreferences, recipesPreferences[1])
-        consumption2Html(requestedRates, consumption, noRecipes, overproduction, args.consumption, "img")
-
-    if args.groups:
-        recipesGroups = loadGroups(args.groups)
+        consumption2Html(requestedRates, consumption, noRecipes, overproduction, args.output_html_consumption, "img")
+        print("HTML consumption file \"{}\" writen".format(args.output_html_consumption))
+    if args.output_groups_dir:
+        recipesGroups = loadGroups(args.output_groups_dir)
         outFolderPath = "."
-        if args.groupspath:
-            outFolderPath = args.groupspath
+        if args.input_groups_data:
+            outFolderPath = args.input_groups_data
         for groupName, recipesNames in recipesGroups.items():
             recipesGroup = {}
             for recipeName in recipesNames:
-                recipesGroup[recipeName] = recipes[recipeName]
+                recipesGroup[recipeName] = recipesByName[recipeName]
             writeRecipesJsonFile(recipesGroup, os.path.join(outFolderPath, "recipes"+groupName[0].upper()+groupName[1:]+".json"))
-
-    if args.factoriopath:
-        for folderPath in itemsPngCopyFolderPathes:
-            if not os.path.exists(folderPath):
-                os.makedirs(folderPath)
-            itemsPngCopy(recipes, args.factoriopath, folderPath, itemPngRenames)

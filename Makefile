@@ -13,22 +13,25 @@ all: out/recipesRobotAll.svg out/recipesBeltInserterAll.svg \
 	out/consumptionProductionScience.html out/consumptionTest.html
 
 /tmp/%All.dot: /tmp/%.json factorioRecipeDependency.py
-	./factorioRecipeDependency.py --open $< --dot $@
+	./factorioRecipeDependency.py --input-json $< --output-dot $@
 
 /tmp/%Wm.dot: /tmp/%.json factorioRecipeDependency.py
-	./factorioRecipeDependency.py --open $< --items $(MAIN) --dot $@
+	./factorioRecipeDependency.py --input-json $< --items $(MAIN) --output-dot $@
 
-out/%.svg: /tmp/%.dot
+out/%.svg: /tmp/%.dot out/img
 	cd out && dot -Tsvg $< -o ../$@
 
 out/recipesAll.json: factorioRecipeDependency.py data/factorio-1.1.76.json
-	./factorioRecipeDependency.py --factoriopath ~/.steam/debian-installation/steamapps/common/Factorio/ --factorioData data/factorio-1.1.76.json --json $@
+	./factorioRecipeDependency.py --factorio-path ~/.steam/debian-installation/steamapps/common/Factorio/ --input-factorio-data data/factorio-1.1.76.json --output-json $@
 
-out/recipesAllUsage.html: out/recipesAll.json factorioRecipeDependency.py
-	./factorioRecipeDependency.py --open $< --usage $@
+out/img: factorioRecipeDependency.py
+	./factorioRecipeDependency.py --factorio-path ~/.steam/debian-installation/steamapps/common/Factorio/ --input-factorio-data data/factorio-1.1.76.json --output-png-dir $@
 
-out/consumption%.html: data/consumption%.json out/recipesAll.json data/factorio-1.1.76.json factorioRecipeDependency.py data/script.js
-	./factorioRecipeDependency.py --open out/recipesAll.json --consumption $@ --factorioData data/factorio-1.1.76.json --consumptionData $<
+out/recipesAllUsage.html: out/recipesAll.json out/img factorioRecipeDependency.py
+	./factorioRecipeDependency.py --input-json $< --output-html-usage $@
+
+out/consumption%.html: data/consumption%.json out/img out/recipesAll.json data/factorio-1.1.76.json factorioRecipeDependency.py data/script.js
+	./factorioRecipeDependency.py --input-json out/recipesAll.json --output-html-consumption $@ --input-factorio-data data/factorio-1.1.76.json --input-consumption-data $<
 
 /tmp/recipes%.json: out/recipesAll.json data/recipesGroups.json factorioRecipeDependency.py
-	./factorioRecipeDependency.py --open $< --groups data/recipesGroups.json --groupspath /tmp/
+	./factorioRecipeDependency.py --input-json $< --output-groups-dir data/recipesGroups.json --input-groups-data /tmp/
