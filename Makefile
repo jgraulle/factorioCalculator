@@ -10,7 +10,8 @@ all: out/recipesRobotAll.svg out/recipesBeltInserterAll.svg \
 	out/recipesModuleAll.svg out/recipesUraniumAll.svg \
 	out/recipesNoNeedAll.svg out/recipesSpidertronAll.svg \
 	out/recipesAmmoAll.svg out/consumptionAllScience.html \
-	out/consumptionProductionScience.html out/consumptionTest.html
+	out/consumptionProductionScience.html out/consumptionTest.html \
+	out/groups.svg out/groups.html
 
 /tmp/%All.dot: /tmp/%.json factorioRecipeDependency.py
 	./factorioRecipeDependency.py --input-json $< --output-dot $@
@@ -34,4 +35,13 @@ out/consumption%.html: data/consumption%.json out/img out/recipesAll.json data/f
 	./factorioRecipeDependency.py --input-json out/recipesAll.json --output-html-consumption $@ --input-factorio-data data/factorio-1.1.76.json --input-consumption-data $<
 
 /tmp/recipes%.json: out/recipesAll.json data/recipesGroups.json factorioRecipeDependency.py
-	./factorioRecipeDependency.py --input-json $< --output-groups-dir data/recipesGroups.json --input-groups-data /tmp/
+	./factorioRecipeDependency.py --input-json $< --input-groups-data data/recipesGroups.json --output-groups-dir /tmp/
+
+out/groups.svg: out/groups.dot out/img
+	cd out && dot -Tsvg ../$< -o ../$@
+
+out/groups.dot: out/recipesAll.json data/recipesGroups.json factorioRecipeDependency.py
+	./factorioRecipeDependency.py --input-json $< --input-groups-data data/recipesGroups.json --output-groups-dot $@
+
+out/groups.html: out/recipesAll.json data/recipesGroups.json factorioRecipeDependency.py data/script.js
+	./factorioRecipeDependency.py --input-json $< --input-groups-data data/recipesGroups.json --output-groups-html $@

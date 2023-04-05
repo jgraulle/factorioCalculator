@@ -295,7 +295,7 @@ def ingredientsByUsage2Html(ingredientsByUsage: dict, htmlFilePath: string, item
                                 for resultName in resultList:
                                     doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, resultName+".png"), alt=resultName, title=resultName)
 
-    html = doc.getvalue()
+    html = yattag.indent(doc.getvalue())
     with open(htmlFilePath, "wb") as htmlFile:
         htmlFile.write(bytes(html, "utf8"))
 
@@ -321,7 +321,6 @@ def generateDot(recipes: RecipesByName, dotFilePath: string, itemsPngCopyFolderP
         dotFile.write("\n")
         # Write edge 
         for recipe in recipes.values():
-            ingredients = "{"
             for resultName in recipe.results.keys():
                 ingredients = ', '.join(convertItemName(ingredientName) for ingredientName in recipe.ingredients.keys())
                 dotFile.write("   {{{}}} -> {}\n".format(ingredients, convertItemName(resultName)))
@@ -641,6 +640,144 @@ def loadGroups(jsonFilePath: string) -> dict[str, list[str]]:
     return recipesGroups
 
 
+def getRequestedAndProvidedList(recipes: RecipesByName) -> tuple[set[str], set[str]]:
+    ingredients = set()
+    results = set()
+    for recipe in recipes.values():
+        {ingredient: ingredients.add(ingredient) for ingredient in recipe.ingredients.keys()}
+        {result: results.add(result) for result in recipe.results.keys()}
+    return (ingredients.difference(results), results)
+
+
+def generateGroupsDependencies(requestedAndProvidedListByGroup: dict[str, tuple[set[str], set[str]]]) -> dict[str, dict[str, set[str]]]:
+    # Compute a list of all item request from a group to another
+    groupRequestItems = set()
+    for groupName, (requestedList, _) in requestedAndProvidedListByGroup.items():
+        groupRequestItems.update(requestedList)
+    # Compute group provider for each group requested item
+    itemProvider = {}
+    for groupName, (_, providedList) in requestedAndProvidedListByGroup.items():
+        for providedItemName in providedList:
+            if providedItemName in groupRequestItems:
+                if providedItemName not in itemProvider:
+                    itemProvider[providedItemName] = set()
+                itemProvider[providedItemName].add(groupName)
+    # Compute group dependencies
+    groupsDependencies = dict()
+    for group1Name, (requestedList, _) in requestedAndProvidedListByGroup.items():
+        groupsDependencies[group1Name] = dict()
+        for requestedItemName in requestedList:
+            if requestedItemName in itemProvider:
+                if len(itemProvider[requestedItemName])>1:
+                    print('Warning: "{}" in "{}" provided by [{}]'.format(requestedItemName, group1Name, ", ".join(itemProvider[requestedItemName])))
+                group2Name = next(iter(itemProvider[requestedItemName]))
+            else:
+                group2Name = ""
+            if group2Name not in groupsDependencies[group1Name]:
+                groupsDependencies[group1Name][group2Name] = set()
+            groupsDependencies[group1Name][group2Name].add(requestedItemName)
+    return groupsDependencies
+
+
+def generateItemsUsedByGroup(groupsDependencies: dict[str, dict[str, set[str]]]) -> dict[str, dict[str, set[str]]]:
+    itemsUsedByGroup = dict()
+    for group1Name, dependencies in groupsDependencies.items():
+        for group2Name, itemsNames in dependencies.items():
+            for itemName in itemsNames:
+                if group2Name not in itemsUsedByGroup:
+                    itemsUsedByGroup[group2Name] = dict()
+                if itemName not in itemsUsedByGroup[group2Name]:
+                    itemsUsedByGroup[group2Name][itemName] = set()
+                itemsUsedByGroup[group2Name][itemName].add(group1Name)
+    return itemsUsedByGroup
+
+
+def groupsDependenciesToDot(groupsDependencies: dict[str, dict[str, str]], dotFilePath: str, itemsPngCopyFolderPath: str):
+    def convertItemOrGroupName(name:str):
+        if name == "":
+            return '""'
+        return name.replace("-", "_").replace(" ", "_")
+    with open(dotFilePath, "w") as dotFile:
+        dotFile.write("digraph {\n")
+        # Write Node
+        for groupName, dependencies in groupsDependencies.items():
+            dotFile.write("{}\n".format(convertItemOrGroupName(groupName)))
+        dotFile.write("\n")
+        # Write edge
+        for group1Name, dependencies in groupsDependencies.items():
+            for group2Name in dependencies.keys():
+                dotFile.write("   {} -> {}\n".format(convertItemOrGroupName(group1Name), convertItemOrGroupName(group2Name)))
+        dotFile.write("}\n")
+
+
+def groupsDependenciesToHtml(groupsDependencies: dict[str, dict[str, str]], htmlFilePath: str, itemsPngCopyFolderPath: str):
+    doc, tag, text = yattag.Doc().tagtext()
+    with tag('html'):
+        with tag("head"):
+            with tag("style"):
+                text("table, th, td {border: 1px solid black;border-collapse: collapse;}")
+        with tag('body'):
+            with tag('table', id="dependenciesTable"):
+                with tag('thead'):
+                    with tag('tr'):
+                        with tag('th', onclick='sortTable("dependenciesTable", 0)'):
+                            text("group")
+                        with tag('th', onclick='sortTable("dependenciesTable", 1)'):
+                            text("count")
+                        with tag('th'):
+                            text("dependencies")
+                with tag('tbody'):
+                    for group1Name, dependencies in groupsDependencies.items():
+                        with tag('tr'):
+                            with tag('td', ("data-sort", group1Name)):
+                                text(group1Name)
+                            count = sum([len(itemNameList) for itemNameList in dependencies.values()])
+                            with tag('td', ("data-sort", str(count))):
+                                text(count)
+                            with tag('td'):
+                                with tag('table'):
+                                    with tag('tr'):
+                                        for group2Name, itemNameList in dependencies.items():
+                                            with tag('td'):
+                                                if group2Name != "":
+                                                    text(group2Name)
+                                                    doc.stag('br')
+                                                for itemName in itemNameList:
+                                                    doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, itemName+".png"), alt=itemName, title=itemName)
+            doc.stag('br')
+            itemsUsedByGroup = generateItemsUsedByGroup(groupsDependencies)
+            with tag('table', id="usedByTable"):
+                with tag('thead'):
+                    with tag('tr'):
+                        with tag('th', onclick='sortTable("usedByTable", 0)'):
+                            text("group")
+                        with tag('th', onclick='sortTable("usedByTable", 1)'):
+                            text("item")
+                        with tag('th', onclick='sortTable("usedByTable", 2)'):
+                            text("count")
+                        with tag('th'):
+                            text("used by")
+                with tag('tbody'):
+                    for group1Name, itemUsedBy in itemsUsedByGroup.items():
+                        for itemName, groups in itemUsedBy.items():
+                            with tag('tr'):
+                                with tag('td', ("data-sort", group1Name)):
+                                    text(group1Name)
+                                with tag('td', ("data-sort", itemName)):
+                                    doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, itemName+".png"), alt=itemName, title=itemName)
+                                with tag('td', ("data-sort", str(len(groups)))):
+                                    text(len(groups))
+                                with tag('td'):
+                                    text(", ".join(groups))
+            with tag('script'):
+                with open("data/script.js", 'r') as javaScriptFile:
+                    doc.asis("\n")
+                    doc.asis(javaScriptFile.read())
+    html = yattag.indent(doc.getvalue())
+    with open(htmlFilePath, "wb") as htmlFile:
+        htmlFile.write(bytes(html, "utf8"))
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="""Generate recipes data from factorio game data.""")
     # Recipes loarders
@@ -660,6 +797,8 @@ if __name__ == '__main__':
     recipesWritersArgs.add_argument("--output-dot", type=pathlib.Path, help="Generate the given graphviz dot file")
     recipesWritersArgs.add_argument("--output-html-consumption", type=pathlib.Path, help="Generate the given HTML page with for each recipes the consume rate")
     recipesWritersArgs.add_argument('--output-groups-dir', type=pathlib.Path, help="Folder path to generate recipe file from group")
+    recipesWritersArgs.add_argument('--output-groups-dot', type=pathlib.Path, help="Generate the given graphviz dot file from group")
+    recipesWritersArgs.add_argument('--output-groups-html', type=pathlib.Path, help="Generate the given HTML file dependencies from group")
     recipesWritersArgs.add_argument('--output-png-dir', type=pathlib.Path, help="Folder path to generate png for each item from factorio path")
     # Additionnal input arguments
     recipesAddInputsArgs = parser.add_argument_group("Additionnal input arguments")
@@ -727,13 +866,25 @@ if __name__ == '__main__':
         consumption, noRecipes, overproduction = computeConsumptionRates(recipesByResult, requestedRates, craftingFactoriesByName, factoriesPreferences, recipesPreferences[1])
         consumption2Html(requestedRates, consumption, noRecipes, overproduction, args.output_html_consumption, "img")
         print("HTML consumption file \"{}\" writen".format(args.output_html_consumption))
-    if args.output_groups_dir:
-        recipesGroups = loadGroups(args.output_groups_dir)
-        outFolderPath = "."
-        if args.input_groups_data:
-            outFolderPath = args.input_groups_data
+    if args.output_groups_dir or args.output_groups_dot or args.output_groups_html:
+        print("Load recipes groups from {}".format(args.input_groups_data))
+        recipesGroups = loadGroups(args.input_groups_data)
+        requestedAndProvidedListByGroup = {}
         for groupName, recipesNames in recipesGroups.items():
             recipesGroup = {}
             for recipeName in recipesNames:
                 recipesGroup[recipeName] = recipesByName[recipeName]
-            writeRecipesJsonFile(recipesGroup, os.path.join(outFolderPath, "recipes"+groupName[0].upper()+groupName[1:]+".json"))
+            if args.output_groups_dir:
+                recipesJsonFilePath = os.path.join(args.output_groups_dir, "recipes"+groupName[0].upper()+groupName[1:]+".json")
+                writeRecipesJsonFile(recipesGroup, recipesJsonFilePath)
+                print("Recipe jsonfile \"{}\" writen".format(recipesJsonFilePath))
+            if groupName not in {"noNeed", "onlyOnce"}:
+                requestedAndProvidedListByGroup[groupName] = getRequestedAndProvidedList(recipesGroup)
+        if args.output_groups_dot or args.output_groups_html:
+            groupsDependencies = generateGroupsDependencies(requestedAndProvidedListByGroup)
+            if args.output_groups_dot:
+                groupsDependenciesToDot(groupsDependencies, args.output_groups_dot, "img")
+                print("Groups dependencies dot file \"{}\" writen".format(args.output_groups_dot))
+            if args.output_groups_html:
+                groupsDependenciesToHtml(groupsDependencies, args.output_groups_html, "img")
+                print("Groups dependencies HTML file \"{}\" writen".format(args.output_groups_html))
