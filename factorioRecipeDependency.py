@@ -531,7 +531,7 @@ def toSiSuffix(quantity: float) -> tuple[float, str]:
     return quantity, ""
 
 
-def consumption2Html(requestedRates: dict, consumptionRate: dict, noRecipes: dict, overproduction: dict, htmlFilePath: string, itemsPngCopyFolderPath: string, prev=None, next=None):
+def consumption2Html(requestedRates: dict, consumptionRate: dict, noRecipes: dict, overproduction: dict, htmlFilePath: string, itemsPngCopyFolderPath: string, prevHtmlPage=None, nextHtmlPage=None):
     electricTotal = 0.0
     consumptionRate = dict(sorted(consumptionRate.items()))
     noRecipes = dict(sorted(noRecipes.items()))
@@ -544,16 +544,16 @@ def consumption2Html(requestedRates: dict, consumptionRate: dict, noRecipes: dic
                 text("td {text-align: right}")
                 text("th {text-align: center}")
         with tag('body'):
-            if prev != None:
-                with tag('a', href=prev):
+            if prevHtmlPage != None:
+                with tag('a', href=prevHtmlPage):
                     text("Prev")
-            if next != None:
-                with tag('a', href=next):
+            if nextHtmlPage != None:
+                with tag('a', href=nextHtmlPage):
                     text("Next")
             with tag('table'):
                 with tag('tr'):
                     with tag('th', colspan=str(len(requestedRates))):
-                        text("Requested")
+                        text("Requested (item/s)")
                 with tag('tr'):
                     for ingredientName, ingredientRate in requestedRates.items():
                         with tag('td'):
@@ -565,25 +565,51 @@ def consumption2Html(requestedRates: dict, consumptionRate: dict, noRecipes: dic
                     with tag('tr'):
                         with tag('th', onclick='sortTable("mainTable", 0)'):
                             text("result")
+                            doc.stag('br')
+                            text("rate (item/s)")
                         with tag('th', onclick='sortTable("mainTable", 1)'):
-                            text("factory count")
-                        with tag('th', onclick='sortTable("mainTable", 2)'):
-                            text("ingredients")
+                            text("result")
+                            doc.stag('br')
+                            text("type")
+                        with tag('th'):
+                            text("others")
+                            doc.stag('br')
+                            text("result")
                         with tag('th', onclick='sortTable("mainTable", 3)'):
+                            text("factory")
+                            doc.stag('br')
+                            text("count")
+                        with tag('th', onclick='sortTable("mainTable", 4)'):
+                            text("factory")
+                            doc.stag('br')
+                            text("type")
+                        with tag('th', onclick='sortTable("mainTable", 5)'):
+                            text("ingredients (item/s)")
+                        with tag('th', onclick='sortTable("mainTable", 6)'):
                             text("electricity")
                 with tag('tbody'):
                     for production in consumptionRate.values():
                         with tag('tr'):
-                            with tag('td', ("data-sort", str(max(production["results"].values())))):
-                                isFirst = True
+                            print(production["results"])
+                            print(type(production["results"]))
+                            print(production["results"].keys())
+                            print(next(iter(production["results"])))
+                            resultNameMax = next(iter(production["results"].keys()))
+                            for resultName, resultRate in production["results"].items():
+                                if production["results"][resultName] > production["results"][resultNameMax]:
+                                    resultNameMax = resultName
+                            with tag('td', ("data-sort", str(production["results"][resultNameMax]))):
+                                text("{:.3f}".format(production["results"][resultNameMax]))
+                            with tag('td', ("data-sort", resultNameMax)):
+                                doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, resultName+".png"), alt=resultName, title=resultName)
+                            with tag('td'):
                                 for resultName, resultRate in production["results"].items():
-                                    if not isFirst:
-                                        text(" + ")
-                                    text("{:.3f}".format(resultRate))
-                                    isFirst = False
-                                    doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, resultName+".png"), alt=resultName, title=resultName)
+                                    if resultName != resultNameMax:
+                                        text(" + {:.3f}".format(resultRate))
+                                        doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, resultName+".png"), alt=resultName, title=resultName)
                             with tag('td', ("data-sort", str(production["factories-count"]))):
                                 text("{:.1f}".format(production["factories-count"]))
+                            with tag('td', ("data-sort", production["factories-name"])):
                                 doc.stag("img", src=os.path.join(itemsPngCopyFolderPath, production["factories-name"]+".png"), alt=production["factories-name"], title=production["factories-name"])
                             with tag('td', ("data-sort", str(max(production["ingredients"].values())))):
                                 isFirst = True
@@ -602,6 +628,9 @@ def consumption2Html(requestedRates: dict, consumptionRate: dict, noRecipes: dic
                         doc.stag('td')
                         doc.stag('td')
                         doc.stag('td')
+                        doc.stag('td')
+                        doc.stag('td')
+                        doc.stag('td')
                         with tag('td'):
                             electric, suffix = toSiSuffix(electricTotal)
                             text("{:.1f}{}W".format(electric, suffix))
@@ -609,7 +638,7 @@ def consumption2Html(requestedRates: dict, consumptionRate: dict, noRecipes: dic
             with tag('table'):
                 with tag('tr'):
                     with tag('th', colspan=str(len(noRecipes))):
-                        text("base")
+                        text("base rate (item/s)")
                 with tag('tr'):
                     for ingredientName, ingredientRate in noRecipes.items():
                         with tag('td'):
