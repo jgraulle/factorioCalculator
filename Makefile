@@ -9,7 +9,7 @@ all: out/recipesRobotAll.svg out/recipesBeltInserterAll.svg \
 	out/recipesRocketAll.svg out/recipesMall4All.svg \
 	out/recipesModuleAll.svg out/recipesUraniumAll.svg \
 	out/recipesNoNeedAll.svg out/recipesSpidertronAll.svg \
-	out/recipesAmmoAll.svg out/consumptionAllScience.html \
+	out/recipesAmmo1All.svg out/recipesAmmo2All.svg out/consumptionAllScience.html \
 	out/consumptionProductionScience.html out/consumptionTest.html \
 	out/groups.svg out/groups.html
 
